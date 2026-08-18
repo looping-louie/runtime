@@ -1,0 +1,39 @@
+###############################################################################
+#
+# Taken from koine v0.1.0
+#
+###############################################################################
+
+# top-most EditorConfig file
+root = true
+
+# common rules for all files
+[*]
+end_of_line = lf
+insert_final_newline = true
+
+[migrations/**/*.sql]
+# SQLite migrations are immutable after they have been applied. The migration
+# runner records a SHA-256 checksum of every file's exact bytes, including
+# trailing whitespace and whether the final statement ends with a newline.
+# Save-time normalization can therefore change an already-applied migration
+# without changing its SQL semantics, causing checksum validation to fail and
+# blocking application startup for databases that recorded the original bytes.
+# These settings deliberately override the global defaults: do not reformat or
+# normalize existing migration files; create a new forward migration instead.
+insert_final_newline = false
+trim_trailing_whitespace = false
+
+# python files rules
+[*.py]
+charset = utf-8
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+# bash files rules
+[*.sh]
+charset = utf-8
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
