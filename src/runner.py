@@ -29,6 +29,6 @@ def run_forever(
     while True:
         try:
             worker.run_once()
-        except Exception:
+        except RuntimeError:
             LOGGER.exception('Runtime worker poll failed; retrying after delay.')
         sleep(poll_interval_seconds)
