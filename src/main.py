@@ -28,10 +28,14 @@ def main() -> None:
     if arguments.check:
         return
     activity_client = ActivityRunClient(api_base_url=config.api_base_url)
+    pipeline_client = PipelineRunClaimClient(api_base_url=config.api_base_url)
     worker = RuntimeWorker(
         config=config,
-        claim_client=PipelineRunClaimClient(api_base_url=config.api_base_url),
-        execute_claim=ActivityExecutor(activity_client=activity_client).execute_claim,
+        claim_client=pipeline_client,
+        execute_claim=ActivityExecutor(
+            activity_client=activity_client,
+            pipeline_client=pipeline_client,
+        ).execute_claim,
     )
     run_forever(
         worker=worker,

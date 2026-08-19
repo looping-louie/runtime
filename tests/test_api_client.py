@@ -63,3 +63,39 @@ def test_claim_next_returns_none_when_workspace_has_no_work() -> None:
     )
 
     assert client.claim_next(workspace_id='workspace-1', worker_id='worker-1') is None
+
+
+def test_continue_run_uses_workspace_scoped_contract() -> None:
+    """A terminal child is submitted to the pipeline scheduler for advancement."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        """Assert the runtime sends the documented continuation request."""
+
+        assert request.method == 'POST'
+        assert request.url == (
+            'https://api.example/api/v1/pipelines/pipeline-1/runs/run-1/continue'
+        )
+        assert request.headers['X-Workspace-ID'] == 'workspace-1'
+        assert json.loads(request.content) == {}
+        return httpx.Response(
+            200,
+            json={
+                'id': 'run-1',
+                'pipeline_id': 'pipeline-1',
+                'status': 'completed',
+                'current_activity_run': None,
+            },
+        )
+
+    client = PipelineRunClaimClient(
+        api_base_url='https://api.example/api/v1',
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    response = client.continue_run(
+        workspace_id='workspace-1',
+        pipeline_id='pipeline-1',
+        run_id='run-1',
+    )
+
+    assert response['status'] == 'completed'

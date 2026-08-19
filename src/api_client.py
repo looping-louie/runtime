@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -47,6 +48,34 @@ class PipelineRunClaimClient:
                 f'{response.text}'
             )
         return self._to_claim(response.json(), workspace_id=workspace_id)
+
+    def continue_run(
+        self,
+        *,
+        workspace_id: str,
+        pipeline_id: str,
+        run_id: str,
+    ) -> dict[str, object]:
+        """Advance a terminal child and return the pipeline's scheduler state."""
+
+        try:
+            response = self._client.post(
+                f'{self._api_base_url}/pipelines/{quote(pipeline_id, safe="")}/runs/'
+                f'{quote(run_id, safe="")}/continue',
+                json={},
+                headers={'X-Workspace-ID': workspace_id},
+            )
+        except httpx.RequestError as exc:
+            raise RuntimeError(f'Pipeline continuation request failed: {exc}') from exc
+        if response.is_error:
+            raise RuntimeError(
+                f'Pipeline continuation request returned HTTP {response.status_code}: '
+                f'{response.text}'
+            )
+        value: Any = response.json()
+        if not isinstance(value, dict):
+            raise RuntimeError('Pipeline continuation response must be a JSON object.')
+        return value
 
     @staticmethod
     def _to_claim(value: Any, *, workspace_id: str) -> ClaimedPipelineRun:

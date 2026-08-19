@@ -40,8 +40,8 @@ next cycle. A failed poll is logged and retried in the next cycle.
 
 ## Execution
 
-For a claimed Activity run, the runtime performs these checkpoint actions in
-the mapped checkout:
+For each Activity child scheduled within a claimed Pipeline run, the runtime
+performs these checkpoint actions in the mapped checkout:
 
 - `collect_snapshot`: sends bounded repository context, project metadata, and
 	the checkout constitution to the API.
@@ -51,6 +51,10 @@ the mapped checkout:
 	contents.
 - `commit_if_allowed`: enforces local `louie.yaml` Git policy, then commits an
 	API-approved change when allowed.
+
+After a child reaches a terminal state, the runtime advances the Pipeline and
+executes its next scheduled child in the same checkout until the Pipeline is
+terminal.
 
 The runtime never selects a checkout from an API response. It uses only the
 workspace-to-checkout mapping in its local configuration.

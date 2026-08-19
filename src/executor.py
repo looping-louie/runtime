@@ -48,28 +48,70 @@ class ActivityCheckpointClient(Protocol):
         """Submit one local checkpoint result and return its next state."""
 
 
+class PipelineContinuationClient(Protocol):
+    """Advance claimed Pipelines after their selected Activity child is terminal."""
+
+    def continue_run(
+        self,
+        *,
+        workspace_id: str,
+        pipeline_id: str,
+        run_id: str,
+    ) -> dict[str, object]:
+        """Return the pipeline state scheduled after its terminal current child."""
+
+
 class ActivityExecutor:
     """Resume claimed Activity runs through runtime-owned local checkpoints."""
 
-    def __init__(self, *, activity_client: ActivityCheckpointClient) -> None:
-        """Store the API checkpoint client used to continue Activity runs."""
+    def __init__(
+        self,
+        *,
+        activity_client: ActivityCheckpointClient,
+        pipeline_client: PipelineContinuationClient,
+    ) -> None:
+        """Store the API clients used to complete Activity and Pipeline runs."""
 
         self._activity_client = activity_client
+        self._pipeline_client = pipeline_client
 
     def execute_claim(self, claim: ClaimedPipelineRun, checkout_path: Path) -> None:
         """Execute the claimed child's supported checkpoint actions to completion."""
 
-        child = _require_child(claim.payload)
+        pipeline_run = claim.payload
+        while (child := pipeline_run.get('current_activity_run')) is not None:
+            if not isinstance(child, dict):
+                raise RuntimeError('Pipeline run has an invalid current_activity_run.')
+            self._execute_child(
+                workspace_id=claim.workspace_id,
+                child=child,
+                checkout_path=checkout_path,
+            )
+            pipeline_run = self._pipeline_client.continue_run(
+                workspace_id=claim.workspace_id,
+                pipeline_id=claim.pipeline_id,
+                run_id=claim.run_id,
+            )
+
+    def _execute_child(
+        self,
+        *,
+        workspace_id: str,
+        child: dict[str, object],
+        checkout_path: Path,
+    ) -> None:
+        """Resume one scheduled Activity child through its local checkpoints."""
+
         activity_id = _require_text(child, 'activity_id')
         run_id = _require_text(child, 'id')
         response = self._activity_client.get_run(
-            workspace_id=claim.workspace_id,
+            workspace_id=workspace_id,
             activity_id=activity_id,
             run_id=run_id,
         )
         while response.get('status') == 'in_progress':
             response = self._activity_client.continue_run(
-                workspace_id=claim.workspace_id,
+                workspace_id=workspace_id,
                 activity_id=activity_id,
                 run_id=run_id,
                 continuation_token=_require_text(response, 'continuation_token'),
@@ -112,15 +154,6 @@ class ActivityExecutor:
         if action == 'commit_if_allowed':
             return _commit_result(response=response, checkout_path=checkout_path)
         raise RuntimeError(f'Unsupported runtime activity action: {action!r}.')
-
-
-def _require_child(payload: dict[str, object]) -> dict[str, object]:
-    """Return the current Activity run supplied by a pipeline claim response."""
-
-    child = payload.get('current_activity_run')
-    if not isinstance(child, dict):
-        raise RuntimeError('Claimed pipeline run is missing current_activity_run.')
-    return child
 
 
 def _apply_operations_result(

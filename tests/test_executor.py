@@ -87,6 +87,52 @@ class FakeActivityClient:
         return next(self._responses)
 
 
+class FakePipelineClient:
+    """Return sequential Activity children after terminal child runs."""
+
+    def __init__(self) -> None:
+        """Initialize the pipeline responses and continuation request log."""
+
+        self.continuations: list[dict[str, str]] = []
+        self._responses = iter(
+            [
+                {
+                    'id': 'run-1',
+                    'pipeline_id': 'pipeline-1',
+                    'status': 'in_progress',
+                    'current_activity_run': {
+                        'id': 'activity-run-2',
+                        'activity_id': 'activity-2',
+                    },
+                },
+                {
+                    'id': 'run-1',
+                    'pipeline_id': 'pipeline-1',
+                    'status': 'completed',
+                    'current_activity_run': None,
+                },
+            ]
+        )
+
+    def continue_run(
+        self,
+        *,
+        workspace_id: str,
+        pipeline_id: str,
+        run_id: str,
+    ) -> dict[str, object]:
+        """Record one pipeline continuation and return its next scheduler state."""
+
+        self.continuations.append(
+            {
+                'workspace_id': workspace_id,
+                'pipeline_id': pipeline_id,
+                'run_id': run_id,
+            }
+        )
+        return next(self._responses)
+
+
 def test_execute_claim_submits_repository_snapshot(tmp_path: Path) -> None:
     """The runtime resumes a claimed child and sends its mapped checkout context."""
 
@@ -100,7 +146,10 @@ def test_execute_claim_submits_repository_snapshot(tmp_path: Path) -> None:
     _git(checkout, 'commit', '-m', 'seed')
     (checkout / 'notes.md').write_text('runtime context\n', encoding='utf-8')
     client = FakeActivityClient()
-    executor = ActivityExecutor(activity_client=client)
+    executor = ActivityExecutor(
+        activity_client=client,
+        pipeline_client=_TerminalPipelineClient(),
+    )
     claim = ClaimedPipelineRun(
         workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
         lease_token='lease-1',
@@ -136,6 +185,91 @@ def test_execute_claim_submits_repository_snapshot(tmp_path: Path) -> None:
     assert commit_result['action'] == 'commit_if_allowed'
     assert commit_result['committed'] is True
     assert isinstance(commit_result['commit_sha'], str)
+
+
+def test_execute_claim_advances_pipeline_through_sequential_children(
+    tmp_path: Path,
+) -> None:
+    """The runtime executes children scheduled after each terminal Activity run."""
+
+    checkout = tmp_path / 'checkout'
+    checkout.mkdir()
+    activity_client = _CompletedActivityClient()
+    pipeline_client = FakePipelineClient()
+    executor = ActivityExecutor(
+        activity_client=activity_client,
+        pipeline_client=pipeline_client,
+    )
+    claim = ClaimedPipelineRun(
+        workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
+        lease_token='lease-1',
+        payload={
+            'current_activity_run': {
+                'id': 'activity-run-1',
+                'activity_id': 'activity-1',
+            }
+        },
+    )
+
+    executor.execute_claim(claim, checkout)
+
+    assert activity_client.requested_runs == [
+        ('activity-1', 'activity-run-1'),
+        ('activity-2', 'activity-run-2'),
+    ]
+    assert pipeline_client.continuations == [
+        {
+            'workspace_id': 'workspace-1',
+            'pipeline_id': 'pipeline-1',
+            'run_id': 'run-1',
+        },
+        {
+            'workspace_id': 'workspace-1',
+            'pipeline_id': 'pipeline-1',
+            'run_id': 'run-1',
+        },
+    ]
+
+
+class _CompletedActivityClient:
+    """Return an immediately completed state for each scheduled child run."""
+
+    def __init__(self) -> None:
+        """Initialize the requested child-run log."""
+
+        self.requested_runs: list[tuple[str, str]] = []
+
+    def get_run(
+        self,
+        *,
+        workspace_id: str,
+        activity_id: str,
+        run_id: str,
+    ) -> dict[str, object]:
+        """Return a completed Activity run for the requested scheduler child."""
+
+        assert workspace_id == 'workspace-1'
+        self.requested_runs.append((activity_id, run_id))
+        return {
+            'id': run_id,
+            'activity_id': activity_id,
+            'status': 'completed',
+            'next_action': 'none',
+        }
+
+    def continue_run(self, **payload: object) -> dict[str, object]:
+        """Reject checkpoint continuation because this test uses terminal children."""
+
+        raise AssertionError(f'Unexpected Activity continuation: {payload}')
+
+
+class _TerminalPipelineClient:
+    """Return a completed pipeline after the fixture's only Activity child."""
+
+    def continue_run(self, **_payload: str) -> dict[str, object]:
+        """Return the terminal scheduler state for the executed child."""
+
+        return {'status': 'completed', 'current_activity_run': None}
 
 
 def _git(repo: Path, *arguments: str) -> None:
