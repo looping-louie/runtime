@@ -45,6 +45,7 @@ def test_claim_next_maps_claimed_run_and_workspace_header() -> None:
     claim = client.claim_next(workspace_id='workspace-1', worker_id='worker-1')
 
     assert claim is not None
+    assert claim.workspace_id == 'workspace-1'
     assert claim.pipeline_id == 'pipeline-1'
     assert claim.run_id == 'run-1'
     assert claim.lease_token == 'lease-1'

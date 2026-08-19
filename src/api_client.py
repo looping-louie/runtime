@@ -46,10 +46,10 @@ class PipelineRunClaimClient:
                 f'Runtime claim request returned HTTP {response.status_code}: '
                 f'{response.text}'
             )
-        return self._to_claim(response.json())
+        return self._to_claim(response.json(), workspace_id=workspace_id)
 
     @staticmethod
-    def _to_claim(value: Any) -> ClaimedPipelineRun:
+    def _to_claim(value: Any, *, workspace_id: str) -> ClaimedPipelineRun:
         """Validate and map one successful API claim response."""
 
         if not isinstance(value, dict):
@@ -63,7 +63,7 @@ class PipelineRunClaimClient:
         pipeline_id = _require_text(run, 'pipeline_id')
         run_id = _require_text(run, 'id')
         return ClaimedPipelineRun(
-            pipeline_id=pipeline_id,
+            workspace_id=workspace_id, pipeline_id=pipeline_id,
             run_id=run_id,
             lease_token=lease_token,
             payload=run,

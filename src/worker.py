@@ -14,6 +14,7 @@ from config import RuntimeConfig
 class ClaimedPipelineRun:
     """A worker-owned API run and the lease token authorizing its execution."""
 
+    workspace_id: str
     pipeline_id: str
     run_id: str
     lease_token: str

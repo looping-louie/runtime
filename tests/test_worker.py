@@ -35,7 +35,7 @@ def test_run_once_executes_claim_in_its_mapped_checkout(tmp_path: Path) -> None:
     first_checkout = tmp_path / 'first'
     second_checkout = tmp_path / 'second'
     claim = ClaimedPipelineRun(
-        pipeline_id='pipeline-1', run_id='run-1', lease_token='lease-1',
+        workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1', lease_token='lease-1',
         payload={'id': 'run-1'},
     )
     client = FakeClaimClient(

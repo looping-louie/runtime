@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import argparse
 
+from activity_client import ActivityRunClient
+from api_client import PipelineRunClaimClient
 from config import load_config
+from executor import ActivityExecutor
+from runner import run_forever
+from worker import RuntimeWorker
 
 
 def main() -> None:
-    """Validate runtime configuration before starting a worker process."""
+    """Validate configuration and run the configured runtime worker indefinitely."""
 
     parser = argparse.ArgumentParser(description='Looping Louie runtime worker.')
     parser.add_argument('--config', required=True, help='Path to runtime JSON configuration.')
@@ -22,4 +27,13 @@ def main() -> None:
     config.validate_checkouts()
     if arguments.check:
         return
-    raise SystemExit('Runtime execution is not configured yet. Use --check.')
+    activity_client = ActivityRunClient(api_base_url=config.api_base_url)
+    worker = RuntimeWorker(
+        config=config,
+        claim_client=PipelineRunClaimClient(api_base_url=config.api_base_url),
+        execute_claim=ActivityExecutor(activity_client=activity_client).execute_claim,
+    )
+    run_forever(
+        worker=worker,
+        poll_interval_seconds=config.poll_interval_seconds,
+    )
