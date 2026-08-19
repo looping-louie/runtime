@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
 from config import RuntimeConfig
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,12 +58,18 @@ class RuntimeWorker:
 
         claimed_count = 0
         for workspace in self._config.workspaces:
-            claim = self._claim_client.claim_next(
-                workspace_id=workspace.workspace_id,
-                worker_id=self._config.worker_id,
-            )
-            if claim is None:
-                continue
-            self._execute_claim(claim, workspace.repository_path)
-            claimed_count += 1
+            try:
+                claim = self._claim_client.claim_next(
+                    workspace_id=workspace.workspace_id,
+                    worker_id=self._config.worker_id,
+                )
+                if claim is None:
+                    continue
+                self._execute_claim(claim, workspace.repository_path)
+                claimed_count += 1
+            except RuntimeError:
+                LOGGER.exception(
+                    'Runtime worker failed for workspace %s; continuing with other workspaces.',
+                    workspace.workspace_id,
+                )
         return claimed_count

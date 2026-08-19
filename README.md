@@ -37,7 +37,8 @@ looping-louie-runtime --config runtime.json
 
 The worker polls every configured workspace, claims at most one available run
 per workspace in each cycle, and waits for `poll_interval_seconds` before the
-next cycle. A failed poll is logged and retried in the next cycle.
+next cycle. A failed workspace claim or execution is logged without skipping
+other configured workspaces, then retried in the next cycle.
 
 ## Execution
 
