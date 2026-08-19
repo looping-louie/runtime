@@ -97,6 +97,7 @@ class ActivityExecutor:
 
         pipeline_run = claim.payload
         _require_pipeline_response(pipeline_run)
+        policy = load_git_policy(checkout_path)
         while (child := pipeline_run.get('current_activity_run')) is not None:
             if not isinstance(child, dict):
                 raise RuntimeError('Pipeline run has an invalid current_activity_run.')
@@ -104,6 +105,7 @@ class ActivityExecutor:
                 claim=claim,
                 child=child,
                 checkout_path=checkout_path,
+                policy=policy,
             )
             self._renew_lease(claim)
             pipeline_run = self._pipeline_client.continue_run(
@@ -120,6 +122,7 @@ class ActivityExecutor:
         claim: ClaimedPipelineRun,
         child: dict[str, object],
         checkout_path: Path,
+        policy: dict[str, object],
     ) -> None:
         """Resume one scheduled Activity child through its local checkpoints."""
 
@@ -141,7 +144,11 @@ class ActivityExecutor:
                 lease_token=claim.lease_token,
                 continuation_token=_require_text(response, 'continuation_token'),
                 idempotency_key=uuid4().hex,
-                result=self._action_result(response=response, checkout_path=checkout_path),
+                result=self._action_result(
+                    response=response,
+                    checkout_path=checkout_path,
+                    policy=policy,
+                ),
             )
             _require_activity_status(response)
 
@@ -160,6 +167,7 @@ class ActivityExecutor:
         *,
         response: dict[str, object],
         checkout_path: Path,
+        policy: dict[str, object],
     ) -> dict[str, object]:
         """Build one supported local checkpoint result for the current Activity state."""
 
@@ -188,7 +196,11 @@ class ActivityExecutor:
                 ),
             }
         if action == 'commit_if_allowed':
-            return _commit_result(response=response, checkout_path=checkout_path)
+            return _commit_result(
+                response=response,
+                checkout_path=checkout_path,
+                policy=policy,
+            )
         raise RuntimeError(f'Unsupported runtime activity action: {action!r}.')
 
 
@@ -220,12 +232,17 @@ def _apply_operations_result(
     }
 
 
-def _commit_result(*, response: dict[str, object], checkout_path: Path) -> dict[str, object]:
+def _commit_result(
+    *,
+    response: dict[str, object],
+    checkout_path: Path,
+    policy: dict[str, object],
+) -> dict[str, object]:
     """Commit API-approved changes unless local checkout policy blocks the action."""
 
     try:
         policy_error = commit_policy_error(
-            policy=load_git_policy(checkout_path),
+            policy=policy,
             current_branch=get_current_branch(checkout_path),
         )
     except RuntimeError as exc:

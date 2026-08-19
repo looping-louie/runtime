@@ -53,7 +53,9 @@ performs these checkpoint actions in the mapped checkout:
 - `submit_review_input`: sends the final Git diff and bounded changed-file
 	contents.
 - `commit_if_allowed`: enforces local `louie.yaml` Git policy, then commits an
-	API-approved change when allowed.
+	API-approved change when allowed. The runtime captures the policy before
+	planned operations begin, so an operation cannot change the policy that
+	authorizes its own commit.
 
 After a child reaches a terminal state, the runtime advances the Pipeline and
 executes its next scheduled child in the same checkout until the Pipeline is

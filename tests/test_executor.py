@@ -299,6 +299,47 @@ def test_execute_claim_rejects_scheduler_response_without_current_child(
         executor.execute_claim(claim, checkout)
 
 
+def test_execute_claim_uses_the_policy_that_existed_before_operations(
+    tmp_path: Path,
+) -> None:
+    """Planned operations cannot loosen the local policy authorizing their commit."""
+
+    checkout = tmp_path / 'checkout'
+    checkout.mkdir()
+    _git(checkout, 'init')
+    _git(checkout, 'config', 'user.name', 'Runtime Test')
+    _git(checkout, 'config', 'user.email', 'runtime@example.com')
+    (checkout / 'louie.yaml').write_text(
+        'git:\n  actions_allowed: []\n',
+        encoding='utf-8',
+    )
+    _git(checkout, 'add', 'louie.yaml')
+    _git(checkout, 'commit', '-m', 'seed policy')
+    activity_client = _PolicyChangingActivityClient()
+    executor = ActivityExecutor(
+        activity_client=activity_client,
+        pipeline_client=_TerminalPipelineClient(),
+    )
+    claim = ClaimedPipelineRun(
+        workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
+        lease_token='lease-1',
+        payload={
+            'status': 'claimed',
+            'current_activity_run': {
+                'id': 'activity-run-1',
+                'activity_id': 'activity-1',
+            }
+        },
+    )
+
+    executor.execute_claim(claim, checkout)
+
+    commit_result = activity_client.continuations[1]['result']
+    assert isinstance(commit_result, dict)
+    assert commit_result['committed'] is False
+    assert 'does not include commit' in str(commit_result['error'])
+
+
 class _CompletedActivityClient:
     """Return an immediately completed state for each scheduled child run."""
 
@@ -343,6 +384,55 @@ class _InvalidStatusActivityClient:
         """Reject checkpoint continuation for an invalid initial state."""
 
         raise AssertionError(f'Unexpected Activity continuation: {payload}')
+
+
+class _PolicyChangingActivityClient:
+    """Return operations that attempt to loosen the local commit policy."""
+
+    def __init__(self) -> None:
+        """Initialize the recorded checkpoint results and response sequence."""
+
+        self.continuations: list[dict[str, object]] = []
+        self._responses = iter(
+            [
+                {
+                    'status': 'in_progress',
+                    'next_action': 'commit_if_allowed',
+                    'continuation_token': 'token-2',
+                    'payload': {'commit_message': 'feat: generated change'},
+                },
+                {'status': 'completed', 'next_action': 'none'},
+            ]
+        )
+
+    def get_run(self, **_payload: str) -> dict[str, object]:
+        """Return policy-changing file operations as the initial checkpoint."""
+
+        return {
+            'status': 'in_progress',
+            'next_action': 'apply_operations',
+            'continuation_token': 'token-1',
+            'payload': {
+                'operations': [
+                    {
+                        'operation': 'replace',
+                        'path': 'louie.yaml',
+                        'content': 'git: {}\n',
+                    },
+                    {
+                        'operation': 'create',
+                        'path': 'output.txt',
+                        'content': 'generated\n',
+                    },
+                ]
+            },
+        }
+
+    def continue_run(self, **payload: object) -> dict[str, object]:
+        """Record one result and return the next planned checkpoint state."""
+
+        self.continuations.append(payload)
+        return next(self._responses)
 
 
 class _TerminalPipelineClient:
