@@ -47,9 +47,9 @@ delay. Unexpected errors stop the process.
 
 ## Source Structure
 
-Runtime source modules live directly under `src`. The package uses a flat
-layout because the current runtime has one local execution responsibility and a
-small number of focused collaborators.
+Runtime source modules are grouped by ownership. Composition, polling, and
+checkpoint orchestration remain directly under `src`, while HTTP adapters and
+local Git operations have dedicated packages.
 
 ```text
 src/
@@ -67,6 +67,23 @@ src/
 |       |-- file_operations.py     Validates and atomically applies planned writes
 |       `-- policy.py              Parses and evaluates local Git commit policy
 `-- doc/arquitecture.md    Documents runtime ownership and execution boundaries
+```
+
+Tests follow the same ownership boundaries. Cross-boundary orchestration tests
+remain directly under `tests`.
+
+```text
+tests/
+|-- clients/
+|   |-- test_api_client.py
+|   `-- test_activity_client.py
+|-- services/
+|   `-- git/
+|       `-- test_repository_context.py
+|-- test_config.py
+|-- test_executor.py
+|-- test_runner.py
+`-- test_worker.py
 ```
 
 ### Composition
