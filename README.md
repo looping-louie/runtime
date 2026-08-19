@@ -60,4 +60,6 @@ claim. Each checkpoint result also includes the claimed Pipeline run and lease
 token, so the API rejects stale workers inside the checkpoint transition.
 
 The runtime never selects a checkout from an API response. It uses only the
-workspace-to-checkout mapping in its local configuration.
+workspace-to-checkout mapping in its local configuration. Repository context
+collection is read-only and does not stage untracked files or otherwise modify
+the Git index.

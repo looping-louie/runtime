@@ -98,15 +98,43 @@ def commit_all(checkout_path: Path, message: str) -> str:
 def get_git_diff(checkout_path: Path) -> str:
     """Return the current checkout diff, including untracked files."""
 
-    _git(checkout_path, 'add', '-N', '.')
-    return _git(checkout_path, 'diff', '--binary', 'HEAD')
+    tracked_diff = _git(checkout_path, 'diff', '--binary', 'HEAD')
+    untracked_diff = ''.join(
+        _untracked_file_diff(checkout_path, relative_path)
+        for relative_path in _untracked_files(checkout_path)
+    )
+    return f'{tracked_diff}{untracked_diff}'
 
 
 def get_changed_files(checkout_path: Path) -> list[str]:
     """Return checkout paths changed from HEAD, including untracked files."""
 
-    _git(checkout_path, 'add', '-N', '.')
-    return [line for line in _git(checkout_path, 'diff', '--name-only', 'HEAD').splitlines() if line]
+    tracked_files = _git(checkout_path, 'diff', '--name-only', 'HEAD').splitlines()
+    return sorted({*tracked_files, *_untracked_files(checkout_path)})
+
+
+def _untracked_files(checkout_path: Path) -> list[str]:
+    """Return non-ignored untracked paths without altering the Git index."""
+
+    return _git(checkout_path, 'ls-files', '--others', '--exclude-standard').splitlines()
+
+
+def _untracked_file_diff(checkout_path: Path, relative_path: str) -> str:
+    """Return a binary diff for one untracked file without staging it."""
+
+    result = subprocess.run(
+        [
+            'git', '-C', str(checkout_path), 'diff', '--no-index', '--binary',
+            '--', '/dev/null', relative_path,
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode in (0, 1):
+        return result.stdout
+    detail = result.stderr.strip() or result.stdout.strip()
+    raise RuntimeError(f'Git command failed: {detail or "unknown error"}')
 
 
 def load_constitution(checkout_path: Path) -> str:
