@@ -45,6 +45,7 @@ def test_get_and_continue_activity_run_use_workspace_scoped_contract() -> None:
     )
     continued = client.continue_run(
         workspace_id='workspace-1', activity_id='activity-1', run_id='activity-run-1',
+        pipeline_run_id='pipeline-run-1', lease_token='lease-1',
         continuation_token='continuation-1', idempotency_key='key-1',
         result={'action': 'collect_snapshot', 'repo_context': 'context'},
     )
@@ -58,6 +59,8 @@ def test_get_and_continue_activity_run_use_workspace_scoped_contract() -> None:
     assert requests[0].url == 'https://api.example/api/v1/activities/activity-1/runs/activity-run-1'
     assert requests[1].url == 'https://api.example/api/v1/activities/activity-1/runs/activity-run-1/continue'
     assert json.loads(requests[1].content) == {
+        'pipeline_run_id': 'pipeline-run-1',
+        'lease_token': 'lease-1',
         'continuation_token': 'continuation-1',
         'idempotency_key': 'key-1',
         'result': {'action': 'collect_snapshot', 'repo_context': 'context'},

@@ -126,6 +126,8 @@ class ActivityExecutor:
                 workspace_id=claim.workspace_id,
                 activity_id=activity_id,
                 run_id=run_id,
+                pipeline_run_id=claim.run_id,
+                lease_token=claim.lease_token,
                 continuation_token=_require_text(response, 'continuation_token'),
                 idempotency_key=uuid4().hex,
                 result=self._action_result(response=response, checkout_path=checkout_path),

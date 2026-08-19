@@ -43,6 +43,8 @@ class ActivityRunClient:
         workspace_id: str,
         activity_id: str,
         run_id: str,
+        pipeline_run_id: str,
+        lease_token: str,
         continuation_token: str,
         idempotency_key: str,
         result: dict[str, object],
@@ -54,6 +56,8 @@ class ActivityRunClient:
             workspace_id=workspace_id,
             path=f'{self._run_path(activity_id=activity_id, run_id=run_id)}/continue',
             payload={
+                'pipeline_run_id': pipeline_run_id,
+                'lease_token': lease_token,
                 'continuation_token': continuation_token,
                 'idempotency_key': idempotency_key,
                 'result': result,
