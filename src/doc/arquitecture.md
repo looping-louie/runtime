@@ -58,7 +58,8 @@ src/
 |-- worker.py              Polls workspace queues and isolates workspace errors
 |-- runner.py              Repeats bounded poll cycles with operational retry
 |-- clients/
-|   |-- api_client.py      Claims, renews, and advances Pipeline runs over HTTP
+|   |-- pipeline_client.py
+|   |                       Claims, renews, and advances Pipeline runs over HTTP
 |   `-- activity_client.py Reads and checkpoints Activity runs over HTTP
 |-- executor.py            Coordinates local checkpoint execution for a claim
 |-- services/
@@ -75,7 +76,7 @@ remain directly under `tests`.
 ```text
 tests/
 |-- clients/
-|   |-- test_api_client.py
+|   |-- test_pipeline_client.py
 |   `-- test_activity_client.py
 |-- services/
 |   `-- git/

@@ -1,4 +1,4 @@
-"""Tests for runtime API claim requests."""
+"""Tests for runtime pipeline claim requests."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 
 import httpx
 
-from clients.api_client import PipelineRunClaimClient
+from clients.pipeline_client import PipelineRunClaimClient
 
 
 def test_claim_next_maps_claimed_run_and_workspace_header() -> None:
