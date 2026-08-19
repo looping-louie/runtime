@@ -54,7 +54,9 @@ performs these checkpoint actions in the mapped checkout:
 
 After a child reaches a terminal state, the runtime advances the Pipeline and
 executes its next scheduled child in the same checkout until the Pipeline is
-terminal.
+terminal. It renews the active Pipeline lease before each checkpoint result and
+before scheduling the next child; a rejected renewal stops execution for that
+claim.
 
 The runtime never selects a checkout from an API response. It uses only the
 workspace-to-checkout mapping in its local configuration.

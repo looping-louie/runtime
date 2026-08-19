@@ -132,6 +132,9 @@ class FakePipelineClient:
         )
         return next(self._responses)
 
+    def renew_lease(self, **_: str) -> None:
+        """Accept runtime lease renewals while the fake claim remains active."""
+
 
 def test_execute_claim_submits_repository_snapshot(tmp_path: Path) -> None:
     """The runtime resumes a claimed child and sends its mapped checkout context."""
@@ -270,6 +273,9 @@ class _TerminalPipelineClient:
         """Return the terminal scheduler state for the executed child."""
 
         return {'status': 'completed', 'current_activity_run': None}
+
+    def renew_lease(self, **_payload: str) -> None:
+        """Accept the single-child fixture's lease renewals."""
 
 
 def _git(repo: Path, *arguments: str) -> None:

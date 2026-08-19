@@ -60,6 +60,16 @@ class PipelineContinuationClient(Protocol):
     ) -> dict[str, object]:
         """Return the pipeline state scheduled after its terminal current child."""
 
+    def renew_lease(
+        self,
+        *,
+        workspace_id: str,
+        pipeline_id: str,
+        run_id: str,
+        lease_token: str,
+    ) -> None:
+        """Extend the active claim lease before a runtime-owned mutation."""
+
 
 class ActivityExecutor:
     """Resume claimed Activity runs through runtime-owned local checkpoints."""
@@ -83,10 +93,11 @@ class ActivityExecutor:
             if not isinstance(child, dict):
                 raise RuntimeError('Pipeline run has an invalid current_activity_run.')
             self._execute_child(
-                workspace_id=claim.workspace_id,
+                claim=claim,
                 child=child,
                 checkout_path=checkout_path,
             )
+            self._renew_lease(claim)
             pipeline_run = self._pipeline_client.continue_run(
                 workspace_id=claim.workspace_id,
                 pipeline_id=claim.pipeline_id,
@@ -96,7 +107,7 @@ class ActivityExecutor:
     def _execute_child(
         self,
         *,
-        workspace_id: str,
+        claim: ClaimedPipelineRun,
         child: dict[str, object],
         checkout_path: Path,
     ) -> None:
@@ -105,19 +116,30 @@ class ActivityExecutor:
         activity_id = _require_text(child, 'activity_id')
         run_id = _require_text(child, 'id')
         response = self._activity_client.get_run(
-            workspace_id=workspace_id,
+            workspace_id=claim.workspace_id,
             activity_id=activity_id,
             run_id=run_id,
         )
         while response.get('status') == 'in_progress':
+            self._renew_lease(claim)
             response = self._activity_client.continue_run(
-                workspace_id=workspace_id,
+                workspace_id=claim.workspace_id,
                 activity_id=activity_id,
                 run_id=run_id,
                 continuation_token=_require_text(response, 'continuation_token'),
                 idempotency_key=uuid4().hex,
                 result=self._action_result(response=response, checkout_path=checkout_path),
             )
+
+    def _renew_lease(self, claim: ClaimedPipelineRun) -> None:
+        """Keep the current worker lease active before mutating API state."""
+
+        self._pipeline_client.renew_lease(
+            workspace_id=claim.workspace_id,
+            pipeline_id=claim.pipeline_id,
+            run_id=claim.run_id,
+            lease_token=claim.lease_token,
+        )
 
     @staticmethod
     def _action_result(

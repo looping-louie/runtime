@@ -77,6 +77,34 @@ class PipelineRunClaimClient:
             raise RuntimeError('Pipeline continuation response must be a JSON object.')
         return value
 
+    def renew_lease(
+        self,
+        *,
+        workspace_id: str,
+        pipeline_id: str,
+        run_id: str,
+        lease_token: str,
+    ) -> None:
+        """Extend the active claim lease before a runtime-owned mutation."""
+
+        try:
+            response = self._client.post(
+                f'{self._api_base_url}/pipelines/{quote(pipeline_id, safe="")}/runs/'
+                f'{quote(run_id, safe="")}/lease',
+                json={'lease_token': lease_token},
+                headers={'X-Workspace-ID': workspace_id},
+            )
+        except httpx.RequestError as exc:
+            raise RuntimeError(f'Pipeline lease renewal request failed: {exc}') from exc
+        if response.is_error:
+            raise RuntimeError(
+                f'Pipeline lease renewal request returned HTTP {response.status_code}: '
+                f'{response.text}'
+            )
+        value: Any = response.json()
+        if not isinstance(value, dict) or not isinstance(value.get('lease_expires_at'), str):
+            raise RuntimeError('Pipeline lease renewal response is missing lease_expires_at.')
+
     @staticmethod
     def _to_claim(value: Any, *, workspace_id: str) -> ClaimedPipelineRun:
         """Validate and map one successful API claim response."""

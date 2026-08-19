@@ -99,3 +99,30 @@ def test_continue_run_uses_workspace_scoped_contract() -> None:
     )
 
     assert response['status'] == 'completed'
+
+
+def test_renew_lease_sends_the_active_claim_token() -> None:
+    """A runtime renewal uses the claimed run, workspace, and secret token."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        """Assert the renewal request follows the documented lease contract."""
+
+        assert request.method == 'POST'
+        assert request.url == (
+            'https://api.example/api/v1/pipelines/pipeline-1/runs/run-1/lease'
+        )
+        assert request.headers['X-Workspace-ID'] == 'workspace-1'
+        assert json.loads(request.content) == {'lease_token': 'lease-1'}
+        return httpx.Response(200, json={'lease_expires_at': '2026-08-19T10:01:00Z'})
+
+    client = PipelineRunClaimClient(
+        api_base_url='https://api.example/api/v1',
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    client.renew_lease(
+        workspace_id='workspace-1',
+        pipeline_id='pipeline-1',
+        run_id='run-1',
+        lease_token='lease-1',
+    )
