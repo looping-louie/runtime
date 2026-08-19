@@ -22,7 +22,8 @@ worker from executing a task in an arbitrary directory supplied by an API run.
 }
 ```
 
-Validate configuration and checkout ownership before starting a worker:
+Validate configuration, Git checkout ownership, and a clean worktree before
+starting a worker:
 
 ```sh
 looping-louie-runtime --config runtime.json --check

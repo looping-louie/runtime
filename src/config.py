@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -47,6 +48,11 @@ class RuntimeConfig:
                 raise ValueError(
                     f'Checkout for workspace {workspace.workspace_id!r} is not a Git '
                     f'repository: {workspace.repository_path}'
+                )
+            if _has_uncommitted_changes(workspace.repository_path):
+                raise ValueError(
+                    f'Checkout for workspace {workspace.workspace_id!r} contains '
+                    'uncommitted changes.'
                 )
 
 
@@ -130,6 +136,29 @@ def _require_text(value: object, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f'{field_name} must be a non-empty string.')
     return value.strip()
+
+
+def _has_uncommitted_changes(checkout_path: Path) -> bool:
+    """Return whether a checkout has non-ignored changes to tracked or new files."""
+
+    try:
+        result = subprocess.run(
+            [
+                'git', '-C', str(checkout_path), 'status', '--porcelain',
+                '--untracked-files=all',
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as exc:
+        raise ValueError(f'Could not inspect Git checkout {checkout_path}: {exc}') from exc
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip()
+        raise ValueError(
+            f'Could not inspect Git checkout {checkout_path}: {detail or "unknown error"}'
+        )
+    return bool(result.stdout.strip())
 
 
 def _reject_unknown_fields(
