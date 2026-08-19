@@ -55,6 +55,7 @@ class PipelineRunClaimClient:
         workspace_id: str,
         pipeline_id: str,
         run_id: str,
+        lease_token: str,
     ) -> dict[str, object]:
         """Advance a terminal child and return the pipeline's scheduler state."""
 
@@ -62,7 +63,7 @@ class PipelineRunClaimClient:
             response = self._client.post(
                 f'{self._api_base_url}/pipelines/{quote(pipeline_id, safe="")}/runs/'
                 f'{quote(run_id, safe="")}/continue',
-                json={},
+                json={'lease_token': lease_token},
                 headers={'X-Workspace-ID': workspace_id},
             )
         except httpx.RequestError as exc:

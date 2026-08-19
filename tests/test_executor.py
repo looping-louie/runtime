@@ -120,6 +120,7 @@ class FakePipelineClient:
         workspace_id: str,
         pipeline_id: str,
         run_id: str,
+        lease_token: str,
     ) -> dict[str, object]:
         """Record one pipeline continuation and return its next scheduler state."""
 
@@ -128,6 +129,7 @@ class FakePipelineClient:
                 'workspace_id': workspace_id,
                 'pipeline_id': pipeline_id,
                 'run_id': run_id,
+                'lease_token': lease_token,
             }
         )
         return next(self._responses)
@@ -225,11 +227,13 @@ def test_execute_claim_advances_pipeline_through_sequential_children(
             'workspace_id': 'workspace-1',
             'pipeline_id': 'pipeline-1',
             'run_id': 'run-1',
+            'lease_token': 'lease-1',
         },
         {
             'workspace_id': 'workspace-1',
             'pipeline_id': 'pipeline-1',
             'run_id': 'run-1',
+            'lease_token': 'lease-1',
         },
     ]
 

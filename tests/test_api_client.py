@@ -76,7 +76,7 @@ def test_continue_run_uses_workspace_scoped_contract() -> None:
             'https://api.example/api/v1/pipelines/pipeline-1/runs/run-1/continue'
         )
         assert request.headers['X-Workspace-ID'] == 'workspace-1'
-        assert json.loads(request.content) == {}
+        assert json.loads(request.content) == {'lease_token': 'lease-1'}
         return httpx.Response(
             200,
             json={
@@ -96,6 +96,7 @@ def test_continue_run_uses_workspace_scoped_contract() -> None:
         workspace_id='workspace-1',
         pipeline_id='pipeline-1',
         run_id='run-1',
+        lease_token='lease-1',
     )
 
     assert response['status'] == 'completed'

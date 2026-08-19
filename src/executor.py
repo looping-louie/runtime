@@ -57,6 +57,7 @@ class PipelineContinuationClient(Protocol):
         workspace_id: str,
         pipeline_id: str,
         run_id: str,
+        lease_token: str,
     ) -> dict[str, object]:
         """Return the pipeline state scheduled after its terminal current child."""
 
@@ -102,6 +103,7 @@ class ActivityExecutor:
                 workspace_id=claim.workspace_id,
                 pipeline_id=claim.pipeline_id,
                 run_id=claim.run_id,
+                lease_token=claim.lease_token,
             )
 
     def _execute_child(
