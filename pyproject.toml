@@ -10,10 +10,11 @@ requires-python = '>=3.12'
 dependencies = []
 
 [project.scripts]
-looping-louie-runtime = 'looping_louie_runtime.main:main'
+looping-louie-runtime = 'main:main'
 
-[tool.setuptools.packages.find]
-where = ['src']
+[tool.setuptools]
+package-dir = {'' = 'src'}
+py-modules = ['config', 'main', 'worker']
 
 [tool.pytest.ini_options]
 asyncio_mode = 'auto'

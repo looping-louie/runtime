@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from looping_louie_runtime.config import load_config
+from config import load_config
 
 
 def write_config(tmp_path: Path, payload: dict[str, object]) -> Path:

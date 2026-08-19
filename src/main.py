@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from looping_louie_runtime.config import load_config
+from config import load_config
 
 
 def main() -> None:

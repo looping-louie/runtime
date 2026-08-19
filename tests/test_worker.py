@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from looping_louie_runtime.config import RuntimeConfig, WorkspaceCheckout
-from looping_louie_runtime.worker import ClaimedPipelineRun, RuntimeWorker
+from config import RuntimeConfig, WorkspaceCheckout
+from worker import ClaimedPipelineRun, RuntimeWorker
 
 
 class FakeClaimClient:

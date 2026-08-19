@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from looping_louie_runtime.config import RuntimeConfig
+from config import RuntimeConfig
 
 
 @dataclass(frozen=True, slots=True)
