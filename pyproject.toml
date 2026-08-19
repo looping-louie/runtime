@@ -24,8 +24,6 @@ looping-louie-runtime = 'main:main'
 [tool.setuptools]
 package-dir = {'' = 'src'}
 py-modules = [
-	'activity_client',
-	'api_client',
 	'config',
 	'executor',
 	'file_operations',
@@ -35,6 +33,7 @@ py-modules = [
 	'runner',
 	'worker',
 ]
+packages = ['clients']
 
 [tool.pytest.ini_options]
 asyncio_mode = 'auto'

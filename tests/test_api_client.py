@@ -6,7 +6,7 @@ import json
 
 import httpx
 
-from api_client import PipelineRunClaimClient
+from clients.api_client import PipelineRunClaimClient
 
 
 def test_claim_next_maps_claimed_run_and_workspace_header() -> None:

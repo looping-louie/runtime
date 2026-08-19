@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import argparse
 
-from activity_client import ActivityRunClient
-from api_client import PipelineRunClaimClient
+from clients.activity_client import ActivityRunClient
+from clients.api_client import PipelineRunClaimClient
 from config import load_config
 from executor import ActivityExecutor
 from runner import run_forever

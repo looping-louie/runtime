@@ -6,7 +6,7 @@ import json
 
 import httpx
 
-from activity_client import ActivityRunClient
+from clients.activity_client import ActivityRunClient
 
 
 def test_get_and_continue_activity_run_use_workspace_scoped_contract() -> None:

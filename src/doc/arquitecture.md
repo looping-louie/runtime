@@ -57,8 +57,9 @@ src/
 |-- config.py              Parses local configuration and validates checkouts
 |-- worker.py              Polls workspace queues and isolates workspace errors
 |-- runner.py              Repeats bounded poll cycles with operational retry
-|-- api_client.py          Claims, renews, and advances Pipeline runs over HTTP
-|-- activity_client.py     Reads and checkpoints Activity runs over HTTP
+|-- clients/
+|   |-- api_client.py      Claims, renews, and advances Pipeline runs over HTTP
+|   `-- activity_client.py Reads and checkpoints Activity runs over HTTP
 |-- executor.py            Coordinates local checkpoint execution for a claim
 |-- repository_context.py  Inspects Git state and builds bounded context
 |-- file_operations.py     Validates and atomically applies planned file writes
@@ -164,8 +165,8 @@ the local half of the checkpoint protocol.
 **Local Git helpers.** `repository_context.py`, `file_operations.py`, and
 `policy.py` remain local Git helpers without HTTP or scheduling concerns.
 
-**HTTP clients.** Clients remain transport adapters and do not perform
-filesystem or Git operations.
+**HTTP clients.** The `clients` package contains transport adapters and does
+not perform filesystem or Git operations.
 
 **New actions.** New Activity action types require an explicit executor action
 handler and a corresponding API checkpoint contract.
