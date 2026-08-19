@@ -161,6 +161,7 @@ def test_execute_claim_submits_repository_snapshot(tmp_path: Path) -> None:
         workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
         lease_token='lease-1',
         payload={
+            'status': 'claimed',
             'current_activity_run': {
                 'id': 'activity-run-1',
                 'activity_id': 'activity-1',
@@ -211,6 +212,7 @@ def test_execute_claim_advances_pipeline_through_sequential_children(
         workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
         lease_token='lease-1',
         payload={
+            'status': 'claimed',
             'current_activity_run': {
                 'id': 'activity-run-1',
                 'activity_id': 'activity-1',
@@ -256,6 +258,7 @@ def test_execute_claim_rejects_invalid_activity_status_before_advancing_pipeline
         workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
         lease_token='lease-1',
         payload={
+            'status': 'claimed',
             'current_activity_run': {
                 'id': 'activity-run-1',
                 'activity_id': 'activity-1',
@@ -267,6 +270,33 @@ def test_execute_claim_rejects_invalid_activity_status_before_advancing_pipeline
         executor.execute_claim(claim, checkout)
 
     assert pipeline_client.continuations == []
+
+
+def test_execute_claim_rejects_scheduler_response_without_current_child(
+    tmp_path: Path,
+) -> None:
+    """A malformed scheduler response cannot be treated as a completed Pipeline."""
+
+    checkout = tmp_path / 'checkout'
+    checkout.mkdir()
+    executor = ActivityExecutor(
+        activity_client=_CompletedActivityClient(),
+        pipeline_client=_MissingCurrentChildPipelineClient(),
+    )
+    claim = ClaimedPipelineRun(
+        workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
+        lease_token='lease-1',
+        payload={
+            'status': 'claimed',
+            'current_activity_run': {
+                'id': 'activity-run-1',
+                'activity_id': 'activity-1',
+            }
+        },
+    )
+
+    with pytest.raises(RuntimeError, match='current_activity_run'):
+        executor.execute_claim(claim, checkout)
 
 
 class _CompletedActivityClient:
@@ -325,6 +355,18 @@ class _TerminalPipelineClient:
 
     def renew_lease(self, **_payload: str) -> None:
         """Accept the single-child fixture's lease renewals."""
+
+
+class _MissingCurrentChildPipelineClient:
+    """Return a schema-invalid Pipeline response after a terminal child."""
+
+    def continue_run(self, **_payload: str) -> dict[str, object]:
+        """Omit the required current child field from the scheduler response."""
+
+        return {'status': 'completed'}
+
+    def renew_lease(self, **_payload: str) -> None:
+        """Accept lease renewal before the malformed scheduler response."""
 
 
 def _git(repo: Path, *arguments: str) -> None:

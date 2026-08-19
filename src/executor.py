@@ -24,6 +24,7 @@ from worker import ClaimedPipelineRun
 
 
 ACTIVITY_RUN_STATUSES = frozenset({'in_progress', 'completed', 'failed', 'stopped'})
+PIPELINE_RUN_STATUSES = frozenset({'queued', 'claimed', 'in_progress', 'failed', 'completed'})
 
 
 class ActivityCheckpointClient(Protocol):
@@ -95,6 +96,7 @@ class ActivityExecutor:
         """Execute the claimed child's supported checkpoint actions to completion."""
 
         pipeline_run = claim.payload
+        _require_pipeline_response(pipeline_run)
         while (child := pipeline_run.get('current_activity_run')) is not None:
             if not isinstance(child, dict):
                 raise RuntimeError('Pipeline run has an invalid current_activity_run.')
@@ -110,6 +112,7 @@ class ActivityExecutor:
                 run_id=claim.run_id,
                 lease_token=claim.lease_token,
             )
+            _require_pipeline_response(pipeline_run)
 
     def _execute_child(
         self,
@@ -271,3 +274,16 @@ def _require_activity_status(response: dict[str, object]) -> str:
     if not isinstance(status, str) or status not in ACTIVITY_RUN_STATUSES:
         raise RuntimeError(f'Activity run has invalid status: {status!r}.')
     return status
+
+
+def _require_pipeline_response(response: dict[str, object]) -> None:
+    """Require the scheduler fields that determine whether work remains."""
+
+    status = response.get('status')
+    if not isinstance(status, str) or status not in PIPELINE_RUN_STATUSES:
+        raise RuntimeError(f'Pipeline run has invalid status: {status!r}.')
+    if 'current_activity_run' not in response:
+        raise RuntimeError('Pipeline run is missing current_activity_run.')
+    current_child = response['current_activity_run']
+    if current_child is not None and not isinstance(current_child, dict):
+        raise RuntimeError('Pipeline run has invalid current_activity_run.')
