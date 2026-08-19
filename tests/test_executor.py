@@ -5,6 +5,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from executor import ActivityExecutor
 from worker import ClaimedPipelineRun
 
@@ -238,6 +240,35 @@ def test_execute_claim_advances_pipeline_through_sequential_children(
     ]
 
 
+def test_execute_claim_rejects_invalid_activity_status_before_advancing_pipeline(
+    tmp_path: Path,
+) -> None:
+    """A malformed child response cannot be treated as terminal work."""
+
+    checkout = tmp_path / 'checkout'
+    checkout.mkdir()
+    pipeline_client = FakePipelineClient()
+    executor = ActivityExecutor(
+        activity_client=_InvalidStatusActivityClient(),
+        pipeline_client=pipeline_client,
+    )
+    claim = ClaimedPipelineRun(
+        workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
+        lease_token='lease-1',
+        payload={
+            'current_activity_run': {
+                'id': 'activity-run-1',
+                'activity_id': 'activity-1',
+            }
+        },
+    )
+
+    with pytest.raises(RuntimeError, match='invalid status'):
+        executor.execute_claim(claim, checkout)
+
+    assert pipeline_client.continuations == []
+
+
 class _CompletedActivityClient:
     """Return an immediately completed state for each scheduled child run."""
 
@@ -266,6 +297,20 @@ class _CompletedActivityClient:
 
     def continue_run(self, **payload: object) -> dict[str, object]:
         """Reject checkpoint continuation because this test uses terminal children."""
+
+        raise AssertionError(f'Unexpected Activity continuation: {payload}')
+
+
+class _InvalidStatusActivityClient:
+    """Return an API-invalid status to test executor response validation."""
+
+    def get_run(self, **_payload: str) -> dict[str, object]:
+        """Return an invalid state that must not advance the Pipeline."""
+
+        return {'status': 'unexpected', 'next_action': 'none'}
+
+    def continue_run(self, **payload: object) -> dict[str, object]:
+        """Reject checkpoint continuation for an invalid initial state."""
 
         raise AssertionError(f'Unexpected Activity continuation: {payload}')
 

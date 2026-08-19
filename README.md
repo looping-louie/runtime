@@ -60,6 +60,8 @@ terminal. It renews the active Pipeline lease before each checkpoint result and
 before scheduling the next child; a rejected renewal stops execution for that
 claim. Each checkpoint result also includes the claimed Pipeline run and lease
 token, so the API rejects stale workers inside the checkpoint transition.
+Malformed Activity responses stop execution for the affected workspace before
+the runtime can advance Pipeline scheduling.
 
 The runtime never selects a checkout from an API response. It uses only the
 workspace-to-checkout mapping in its local configuration. Repository context

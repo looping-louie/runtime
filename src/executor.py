@@ -23,6 +23,9 @@ from repository_context import (
 from worker import ClaimedPipelineRun
 
 
+ACTIVITY_RUN_STATUSES = frozenset({'in_progress', 'completed', 'failed', 'stopped'})
+
+
 class ActivityCheckpointClient(Protocol):
     """Access one Activity run and submit its local checkpoint results."""
 
@@ -124,6 +127,7 @@ class ActivityExecutor:
             activity_id=activity_id,
             run_id=run_id,
         )
+        _require_activity_status(response)
         while response.get('status') == 'in_progress':
             self._renew_lease(claim)
             response = self._activity_client.continue_run(
@@ -136,6 +140,7 @@ class ActivityExecutor:
                 idempotency_key=uuid4().hex,
                 result=self._action_result(response=response, checkout_path=checkout_path),
             )
+            _require_activity_status(response)
 
     def _renew_lease(self, claim: ClaimedPipelineRun) -> None:
         """Keep the current worker lease active before mutating API state."""
@@ -257,3 +262,12 @@ def _require_text(value: dict[str, object], field_name: str) -> str:
     if not isinstance(field_value, str) or not field_value:
         raise RuntimeError(f'Activity run is missing {field_name}.')
     return field_value
+
+
+def _require_activity_status(response: dict[str, object]) -> str:
+    """Return a recognized Activity status before pipeline scheduling uses it."""
+
+    status = response.get('status')
+    if not isinstance(status, str) or status not in ACTIVITY_RUN_STATUSES:
+        raise RuntimeError(f'Activity run has invalid status: {status!r}.')
+    return status
