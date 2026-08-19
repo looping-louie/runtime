@@ -26,14 +26,11 @@ package-dir = {'' = 'src'}
 py-modules = [
 	'config',
 	'executor',
-	'file_operations',
 	'main',
-	'policy',
-	'repository_context',
 	'runner',
 	'worker',
 ]
-packages = ['clients']
+packages = ['clients', 'services', 'services.git']
 
 [tool.pytest.ini_options]
 asyncio_mode = 'auto'

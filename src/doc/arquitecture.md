@@ -61,9 +61,11 @@ src/
 |   |-- api_client.py      Claims, renews, and advances Pipeline runs over HTTP
 |   `-- activity_client.py Reads and checkpoints Activity runs over HTTP
 |-- executor.py            Coordinates local checkpoint execution for a claim
-|-- repository_context.py  Inspects Git state and builds bounded context
-|-- file_operations.py     Validates and atomically applies planned file writes
-|-- policy.py              Parses and evaluates local Git commit policy
+|-- services/
+|   `-- git/
+|       |-- repository_context.py  Inspects Git state and builds bounded context
+|       |-- file_operations.py     Validates and atomically applies planned writes
+|       `-- policy.py              Parses and evaluates local Git commit policy
 `-- doc/arquitecture.md    Documents runtime ownership and execution boundaries
 ```
 
@@ -78,9 +80,9 @@ Dependency flow is:
 ```text
 main -> config, clients, executor, worker, runner
 worker -> ClaimClient, executor callback
-executor -> activity client, pipeline client, local execution helpers
+executor -> activity client, pipeline client, services.git
 clients -> HTTP API
-local execution helpers -> configured Git checkout
+services.git -> configured Git checkout
 ```
 
 The worker and executor depend on protocols rather than concrete HTTP clients.
@@ -162,8 +164,8 @@ isolation, not checkpoint behavior.
 **Checkpoint orchestration.** `executor.py` remains the orchestration point for
 the local half of the checkpoint protocol.
 
-**Local Git helpers.** `repository_context.py`, `file_operations.py`, and
-`policy.py` remain local Git helpers without HTTP or scheduling concerns.
+**Local Git services.** The `services.git` package owns repository context,
+file operations, and commit policy without HTTP or scheduling concerns.
 
 **HTTP clients.** The `clients` package contains transport adapters and does
 not perform filesystem or Git operations.

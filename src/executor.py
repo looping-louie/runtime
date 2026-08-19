@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import Protocol
 from uuid import uuid4
 
-from file_operations import apply_file_operations
-from policy import commit_policy_error, load_git_policy
-from repository_context import (
+from services.git.file_operations import apply_file_operations
+from services.git.policy import commit_policy_error, load_git_policy
+from services.git.repository_context import (
     build_project_profile,
     build_repository_context,
     get_changed_files,
