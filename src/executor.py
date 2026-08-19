@@ -41,6 +41,8 @@ class ActivityCheckpointClient(Protocol):
         workspace_id: str,
         activity_id: str,
         run_id: str,
+        pipeline_run_id: str,
+        lease_token: str,
         continuation_token: str,
         idempotency_key: str,
         result: dict[str, object],
