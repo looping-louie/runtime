@@ -191,7 +191,7 @@ class PipelineRunClaimClient:
             raise RuntimeError('Pipeline lease renewal response is missing lease_expires_at.')
 
     @staticmethod
-    def _to_claim(value: Any, *, workspace_id: str) -> ClaimedPipelineRun:
+    def _to_claim(value: Any, *, workspace_id: str) -> ClaimedPipelineRun | None:
         """Validate and map one successful API claim response."""
 
         if not isinstance(value, dict):
@@ -200,6 +200,8 @@ class PipelineRunClaimClient:
         lease_token = value.get('lease_token')
         if not isinstance(run, dict):
             raise RuntimeError('Runtime claim response is missing the run object.')
+        if run.get('status') == 'waiting':
+            return None
         if not isinstance(lease_token, str) or not lease_token:
             raise RuntimeError('Runtime claim response is missing a lease token.')
         pipeline_id = _require_text(run, 'pipeline_id')
