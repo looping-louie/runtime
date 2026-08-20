@@ -1,4 +1,4 @@
-"""HTTP client for claiming queued pipeline runs from the API."""
+"""HTTP client for discovering and conditionally claiming Pipeline runs."""
 
 from __future__ import annotations
 
@@ -30,17 +30,101 @@ class PipelineRunClaimClient:
         workspace_id: str,
         worker_id: str,
     ) -> ClaimedPipelineRun | None:
-        """Claim one queued workspace run or return None when none are available."""
+        """Claim one candidate run or return None when no work is available."""
+
+        for pipeline_id in self._active_pipeline_ids(workspace_id=workspace_id):
+            for candidate in self._claimable_runs(
+                workspace_id=workspace_id,
+                pipeline_id=pipeline_id,
+            ):
+                claim = self._claim_candidate(
+                    workspace_id=workspace_id,
+                    pipeline_id=pipeline_id,
+                    candidate=candidate,
+                    worker_id=worker_id,
+                )
+                if claim is not None:
+                    return claim
+        return None
+
+    def _active_pipeline_ids(self, *, workspace_id: str) -> list[str]:
+        """Return every active Pipeline ID visible in the selected workspace."""
 
         try:
-            response = self._client.post(
-                f'{self._api_base_url}/pipelines/runs/claim',
-                json={'worker_id': worker_id},
+            response = self._client.get(
+                f'{self._api_base_url}/pipelines',
+                params={'status': 'active'},
                 headers={'X-Workspace-ID': workspace_id},
             )
         except httpx.RequestError as exc:
+            raise RuntimeError(f'Pipeline list request failed: {exc}') from exc
+        if response.is_error:
+            raise RuntimeError(
+                f'Pipeline list request returned HTTP {response.status_code}: '
+                f'{response.text}'
+            )
+        value: Any = response.json()
+        if not isinstance(value, dict) or not isinstance(value.get('items'), list):
+            raise RuntimeError('Pipeline list response must contain an items array.')
+        return [_require_text(item, 'id') for item in value['items'] if isinstance(item, dict)]
+
+    def _claimable_runs(
+        self,
+        *,
+        workspace_id: str,
+        pipeline_id: str,
+    ) -> list[dict[str, object]]:
+        """Return the API-approved claim candidates for one Pipeline."""
+
+        encoded_pipeline_id = quote(pipeline_id, safe='')
+        try:
+            response = self._client.get(
+                f'{self._api_base_url}/pipelines/{encoded_pipeline_id}/runs',
+                params={'claimable': 'true'},
+                headers={'X-Workspace-ID': workspace_id},
+            )
+        except httpx.RequestError as exc:
+            raise RuntimeError(f'Claimable-run list request failed: {exc}') from exc
+        if response.is_error:
+            raise RuntimeError(
+                f'Claimable-run list request returned HTTP {response.status_code}: '
+                f'{response.text}'
+            )
+        value: Any = response.json()
+        if not isinstance(value, dict) or not isinstance(value.get('items'), list):
+            raise RuntimeError('Claimable-run list response must contain an items array.')
+        return [item for item in value['items'] if isinstance(item, dict)]
+
+    def _claim_candidate(
+        self,
+        *,
+        workspace_id: str,
+        pipeline_id: str,
+        candidate: dict[str, object],
+        worker_id: str,
+    ) -> ClaimedPipelineRun | None:
+        """Claim one listed candidate, returning None when another worker won."""
+
+        run = candidate.get('run')
+        etag = candidate.get('etag')
+        if not isinstance(run, dict):
+            raise RuntimeError('Claimable-run candidate is missing its run object.')
+        if not isinstance(etag, str) or not etag:
+            raise RuntimeError('Claimable-run candidate is missing its ETag.')
+        run_id = _require_text(run, 'id')
+        try:
+            response = self._client.patch(
+                f'{self._api_base_url}/pipelines/{quote(pipeline_id, safe="")}/runs/'
+                f'{quote(run_id, safe="")}',
+                json={'worker_id': worker_id, 'status': 'claimed'},
+                headers={
+                    'If-Match': etag,
+                    'X-Workspace-ID': workspace_id,
+                },
+            )
+        except httpx.RequestError as exc:
             raise RuntimeError(f'Runtime claim request failed: {exc}') from exc
-        if response.status_code == httpx.codes.NO_CONTENT:
+        if response.status_code == httpx.codes.PRECONDITION_FAILED:
             return None
         if response.is_error:
             raise RuntimeError(

@@ -50,6 +50,15 @@ Pipeline or Activity status in local storage.
 
 ## Normal Execution
 
+The expected flow is:
+
+1. CLI creates a Pipeline run in queued.
+2. Runtime claims it. The API gives the worker a one-minute lease token and the
+run becomes claimed.
+3. Runtime collects local context and checkpoints it to the API.
+4. API invokes the configured model to produce the planned operations.
+5. Runtime applies approved operations and commits them.
+
 The following diagram shows the usual single-Activity Pipeline flow.
 
 ```mermaid
