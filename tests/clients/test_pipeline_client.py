@@ -23,7 +23,7 @@ def test_claim_next_discovers_and_conditionally_claims_a_run() -> None:
             assert request.url.params['status'] == 'active'
             return httpx.Response(200, json={'items': [{'id': 'pipeline-1'}], 'total': 1})
         if request.method == 'GET':
-            assert request.url == 'https://api.example/api/v1/pipelines/pipeline-1/runs?claimable=True'
+            assert request.url == 'https://api.example/api/v1/pipelines/pipeline-1/runs?claimable=true'
             return httpx.Response(
                 200,
                 json={

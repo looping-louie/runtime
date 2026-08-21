@@ -80,7 +80,7 @@ class PipelineRunClaimClient:
         try:
             response = self._client.get(
                 f'{self._api_base_url}/pipelines/{encoded_pipeline_id}/runs',
-                params={'claimable': 'True'},
+                params={'claimable': 'true'},
                 headers={'X-Workspace-ID': workspace_id},
             )
         except httpx.RequestError as exc:
