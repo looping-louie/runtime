@@ -15,6 +15,7 @@ class WorkspaceCheckout:
     """One API workspace and the checkout a runtime may execute within."""
 
     workspace_id: str
+    worker_id: str
     repository_path: Path
 
 
@@ -23,7 +24,6 @@ class RuntimeConfig:
     """Runtime connection settings and authorized workspace checkouts."""
 
     api_base_url: str
-    worker_id: str
     poll_interval_seconds: float
     workspaces: tuple[WorkspaceCheckout, ...]
 
@@ -70,12 +70,11 @@ def load_config(path: str | Path) -> RuntimeConfig:
         raise ValueError('Runtime configuration must be a JSON object.')
     _reject_unknown_fields(
         raw,
-        {'api_base_url', 'worker_id', 'poll_interval_seconds', 'workspaces'},
+        {'api_base_url', 'poll_interval_seconds', 'workspaces'},
         'Runtime configuration',
     )
     return RuntimeConfig(
         api_base_url=_require_http_url(raw.get('api_base_url'), 'api_base_url'),
-        worker_id=_require_text(raw.get('worker_id'), 'worker_id'),
         poll_interval_seconds=_require_positive_number(
             raw.get('poll_interval_seconds'), 'poll_interval_seconds',
         ),
@@ -93,7 +92,11 @@ def _parse_workspaces(value: object) -> tuple[WorkspaceCheckout, ...]:
     for index, item in enumerate(value):
         if not isinstance(item, dict):
             raise ValueError(f'workspaces[{index}] must be an object.')
-        _reject_unknown_fields(item, {'workspace_id', 'repository_path'}, f'workspaces[{index}]')
+        _reject_unknown_fields(
+            item,
+            {'workspace_id', 'worker_id', 'repository_path'},
+            f'workspaces[{index}]',
+        )
         workspace_id = _require_text(item.get('workspace_id'), f'workspaces[{index}].workspace_id')
         if workspace_id in workspace_ids:
             raise ValueError(f'workspaces contains duplicate workspace_id {workspace_id!r}.')
@@ -101,6 +104,7 @@ def _parse_workspaces(value: object) -> tuple[WorkspaceCheckout, ...]:
         workspaces.append(
             WorkspaceCheckout(
                 workspace_id=workspace_id,
+                worker_id=_require_text(item.get('worker_id'), f'workspaces[{index}].worker_id'),
                 repository_path=Path(
                     _require_text(
                         item.get('repository_path'),

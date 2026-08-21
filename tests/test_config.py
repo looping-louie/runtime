@@ -29,11 +29,11 @@ def test_load_config_resolves_workspace_checkout(tmp_path: Path) -> None:
             tmp_path,
             {
                 'api_base_url': 'http://127.0.0.1:8000/api/v1/',
-                'worker_id': 'runtime-local-01',
                 'poll_interval_seconds': 2,
                 'workspaces': [
                     {
                         'workspace_id': 'workspace-local',
+                        'worker_id': 'worker-1',
                         'repository_path': str(checkout_path),
                     }
                 ],
@@ -43,6 +43,7 @@ def test_load_config_resolves_workspace_checkout(tmp_path: Path) -> None:
 
     assert config.api_base_url == 'http://127.0.0.1:8000/api/v1'
     assert config.checkout_for('workspace-local').repository_path == checkout_path
+    assert config.checkout_for('workspace-local').worker_id == 'worker-1'
 
 
 def test_load_config_rejects_duplicate_workspace_mapping(tmp_path: Path) -> None:
@@ -52,11 +53,18 @@ def test_load_config_rejects_duplicate_workspace_mapping(tmp_path: Path) -> None
         tmp_path,
         {
             'api_base_url': 'http://127.0.0.1:8000/api/v1',
-            'worker_id': 'runtime-local-01',
             'poll_interval_seconds': 2,
             'workspaces': [
-                {'workspace_id': 'workspace-local', 'repository_path': '/first'},
-                {'workspace_id': 'workspace-local', 'repository_path': '/second'},
+                {
+                    'workspace_id': 'workspace-local',
+                    'worker_id': 'worker-1',
+                    'repository_path': '/first',
+                },
+                {
+                    'workspace_id': 'workspace-local',
+                    'worker_id': 'worker-2',
+                    'repository_path': '/second',
+                },
             ],
         },
     )
@@ -75,11 +83,11 @@ def test_validate_checkouts_requires_git_repository(tmp_path: Path) -> None:
             tmp_path,
             {
                 'api_base_url': 'http://127.0.0.1:8000/api/v1',
-                'worker_id': 'runtime-local-01',
                 'poll_interval_seconds': 2,
                 'workspaces': [
                     {
                         'workspace_id': 'workspace-local',
+                        'worker_id': 'worker-1',
                         'repository_path': str(checkout_path),
                     }
                 ],
@@ -103,11 +111,11 @@ def test_validate_checkouts_rejects_dirty_git_repository(tmp_path: Path) -> None
             tmp_path,
             {
                 'api_base_url': 'http://127.0.0.1:8000/api/v1',
-                'worker_id': 'runtime-local-01',
                 'poll_interval_seconds': 2,
                 'workspaces': [
                     {
                         'workspace_id': 'workspace-local',
+                        'worker_id': 'worker-1',
                         'repository_path': str(checkout_path),
                     }
                 ],
@@ -130,11 +138,11 @@ def test_validate_checkouts_accepts_clean_git_repository(tmp_path: Path) -> None
             tmp_path,
             {
                 'api_base_url': 'http://127.0.0.1:8000/api/v1',
-                'worker_id': 'runtime-local-01',
                 'poll_interval_seconds': 2,
                 'workspaces': [
                     {
                         'workspace_id': 'workspace-local',
+                        'worker_id': 'worker-1',
                         'repository_path': str(checkout_path),
                     }
                 ],

@@ -1,13 +1,15 @@
 # Worker Overview
 
-## Registration and heartbeat
+## Provisioning and heartbeat
 
-Each configured runtime registers its `worker_id` separately in every mapped
-workspace before polling. It sends a heartbeat before each workspace poll.
+The API provisions a `worker_id` for each configured workspace. The runtime
+stores that identity in its workspace mapping and sends a heartbeat before each
+workspace poll.
 The API permits a PipelineRun claim only when that worker has sent a heartbeat
-within the active registration window.
+within the active heartbeat window.
 
-Registration answers whether a worker process is currently available. A
+Provisioning answers which durable worker identity may act in a workspace. A
+heartbeat answers whether that identity is currently available. A
 PipelineRun lease answers whether that worker may mutate one specific run.
 They remain independent: a heartbeat does not extend a lease, and a lease
 expires normally even when a worker stops heartbeating.
@@ -15,10 +17,10 @@ expires normally even when a worker stops heartbeating.
 A worker is a specific running instance of `looping-louie-runtime`. It is not
 a new kind of Pipeline, Activity, or ActivityRun.
 
-That identity is `RuntimeConfig.worker_id`. The API persists a durable
-workspace-scoped registration and recent heartbeat for it, then stores the ID
-on claimed `pipeline_runs`. Capabilities remain intentionally deferred: this
-slice does not claim that a registered worker can execute every possible future
+That identity is `WorkspaceCheckout.worker_id`. The API persists a durable
+workspace-scoped identity and recent heartbeat for it, then stores the ID on
+claimed `pipeline_runs`. Capabilities remain intentionally deferred: this slice
+does not claim that a registered worker can execute every possible future
 Activity type.
 
 ```mermaid
@@ -39,8 +41,8 @@ sequenceDiagram
 
 The important distinction is:
 
-- **Worker registration and heartbeat:** control-plane information about a
-  runtime instance.
+- **Worker provisioning and heartbeat:** control-plane identity and liveness
+  information about a runtime instance.
 - **Pipeline-run lease:** short-lived, execution-plane permission for one
   PipelineRun.
 - **ActivityRun:** the universal unit of work, executed by either `runtime` or
@@ -69,7 +71,7 @@ worker polls
   -> API lists work compatible with that active worker
   -> worker attempts ETag-protected claim
   -> API verifies:
-       registered
+      provisioned and heartbeat fresh
        heartbeat fresh
        authorized for workspace
        capable of the selected runtime Activity
@@ -126,7 +128,7 @@ flowchart LR
 
 All current runtime Activity types use the same runtime executable and
 checkpoint protocol. The configured workspace mapping already constrains each
-runtime to repositories it may execute. Registration and heartbeat therefore
+runtime to repositories it may execute. Provisioning and heartbeat therefore
 provide useful liveness and observability, while capability filtering should
 wait for a concrete routing requirement, such as different model-provider
 access, platform tooling, network or credential boundaries, execution engines,
@@ -134,8 +136,8 @@ or workspace-specific worker pools.
 
 The narrow first implementation is:
 
-1. Persist worker registration per workspace with a heartbeat timestamp.
-2. Require an active registration for a runtime claim.
+1. Provision one worker identity per workspace with a heartbeat timestamp.
+2. Require an active heartbeat for a runtime claim.
 3. Keep Pipeline-run leases unchanged.
 4. Do not add capabilities until a real runtime difference requires them.
 5. Schedule human ActivityRuns without a runtime claim.

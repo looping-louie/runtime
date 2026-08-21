@@ -7,15 +7,17 @@ Looping Louie API and executes them in configured local Git checkouts.
 
 Each worker maps API workspaces to local repository checkouts. This keeps a
 worker from executing a task in an arbitrary directory supplied by an API run.
+Provision one worker through `POST /api/v1/workers` for each workspace, then
+place the returned ID in that workspace mapping.
 
 ```json
 {
 	"api_base_url": "http://127.0.0.1:8000/api/v1",
-	"worker_id": "runtime-local-01",
 	"poll_interval_seconds": 2,
 	"workspaces": [
 		{
 			"workspace_id": "local-workspace",
+			"worker_id": "api-provisioned-worker-id",
 			"repository_path": "/absolute/path/to/checkout"
 		}
 	]

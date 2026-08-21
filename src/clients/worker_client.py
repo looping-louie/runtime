@@ -7,8 +7,8 @@ from urllib.parse import quote
 import httpx
 
 
-class WorkerRegistrationClient:
-    """Register configured runtime identities with the API control plane."""
+class WorkerHeartbeatClient:
+    """Refresh provisioned runtime worker liveness with the API control plane."""
 
     def __init__(
         self,
@@ -21,16 +21,6 @@ class WorkerRegistrationClient:
         self._api_base_url = api_base_url.rstrip('/')
         self._client = client or httpx.Client(timeout=60.0)
 
-    def register(self, *, workspace_id: str, worker_id: str) -> None:
-        """Create or refresh one runtime worker registration."""
-
-        self._request(
-            method='PUT',
-            workspace_id=workspace_id,
-            worker_id=worker_id,
-            suffix='',
-        )
-
     def heartbeat(self, *, workspace_id: str, worker_id: str) -> None:
         """Record a liveness heartbeat for one registered runtime worker."""
 
@@ -38,7 +28,6 @@ class WorkerRegistrationClient:
             method='POST',
             workspace_id=workspace_id,
             worker_id=worker_id,
-            suffix='/heartbeat',
         )
 
     def _request(
@@ -47,14 +36,13 @@ class WorkerRegistrationClient:
         method: str,
         workspace_id: str,
         worker_id: str,
-        suffix: str,
     ) -> None:
         """Submit one worker lifecycle request and require a successful response."""
 
         try:
             response = self._client.request(
                 method,
-                f'{self._api_base_url}/workers/{quote(worker_id, safe="")}{suffix}',
+                f'{self._api_base_url}/workers/{quote(worker_id, safe="")}/heartbeat',
                 headers={'X-Workspace-ID': workspace_id},
             )
         except httpx.RequestError as exc:

@@ -37,11 +37,8 @@ class ClaimClient(Protocol):
         """Return one claimed run or None when no work is available."""
 
 
-class WorkerRegistrationClient(Protocol):
-    """Register runtime identities and refresh their liveness signals."""
-
-    def register(self, *, workspace_id: str, worker_id: str) -> None:
-        """Create or refresh one workspace worker registration."""
+class WorkerHeartbeatClient(Protocol):
+    """Refresh liveness signals for provisioned runtime identities."""
 
     def heartbeat(self, *, workspace_id: str, worker_id: str) -> None:
         """Record one worker liveness heartbeat."""
@@ -55,26 +52,15 @@ class RuntimeWorker:
         *,
         config: RuntimeConfig,
         claim_client: ClaimClient,
-        registration_client: WorkerRegistrationClient | None = None,
+        heartbeat_client: WorkerHeartbeatClient | None = None,
         execute_claim: Callable[[ClaimedPipelineRun, Path], None],
     ) -> None:
         """Store the workspace mapping, API client, and execution adapter."""
 
         self._config = config
         self._claim_client = claim_client
-        self._registration_client = registration_client
+        self._heartbeat_client = heartbeat_client
         self._execute_claim = execute_claim
-
-    def register(self) -> None:
-        """Register this runtime for every configured workspace before polling."""
-
-        if self._registration_client is None:
-            return
-        for workspace in self._config.workspaces:
-            self._registration_client.register(
-                workspace_id=workspace.workspace_id,
-                worker_id=self._config.worker_id,
-            )
 
     def run_once(self) -> int:
         """Claim and delegate one available pipeline run for each workspace."""
@@ -82,14 +68,14 @@ class RuntimeWorker:
         claimed_count = 0
         for workspace in self._config.workspaces:
             try:
-                if self._registration_client is not None:
-                    self._registration_client.heartbeat(
+                if self._heartbeat_client is not None:
+                    self._heartbeat_client.heartbeat(
                         workspace_id=workspace.workspace_id,
-                        worker_id=self._config.worker_id,
+                        worker_id=workspace.worker_id,
                     )
                 claim = self._claim_client.claim_next(
                     workspace_id=workspace.workspace_id,
-                    worker_id=self._config.worker_id,
+                    worker_id=workspace.worker_id,
                 )
                 if claim is None:
                     continue
