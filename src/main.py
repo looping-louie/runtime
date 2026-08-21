@@ -6,6 +6,7 @@ import argparse
 
 from clients.activity_client import ActivityRunClient
 from clients.pipeline_client import PipelineRunClaimClient
+from clients.worker_client import WorkerRegistrationClient
 from config import load_config
 from executor import ActivityExecutor
 from runner import run_forever
@@ -29,14 +30,17 @@ def main() -> None:
         return
     activity_client = ActivityRunClient(api_base_url=config.api_base_url)
     pipeline_client = PipelineRunClaimClient(api_base_url=config.api_base_url)
+    worker_client = WorkerRegistrationClient(api_base_url=config.api_base_url)
     worker = RuntimeWorker(
         config=config,
         claim_client=pipeline_client,
+        registration_client=worker_client,
         execute_claim=ActivityExecutor(
             activity_client=activity_client,
             pipeline_client=pipeline_client,
         ).execute_claim,
     )
+    worker.register()
     run_forever(
         worker=worker,
         poll_interval_seconds=config.poll_interval_seconds,

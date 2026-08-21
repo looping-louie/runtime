@@ -32,6 +32,26 @@ class FakeClaimClient:
         return self._claims[workspace_id]
 
 
+class FakeRegistrationClient:
+    """Record worker registration and heartbeat lifecycle calls."""
+
+    def __init__(self) -> None:
+        """Initialize an empty lifecycle request log."""
+
+        self.registrations: list[tuple[str, str]] = []
+        self.heartbeats: list[tuple[str, str]] = []
+
+    def register(self, *, workspace_id: str, worker_id: str) -> None:
+        """Record one workspace registration request."""
+
+        self.registrations.append((workspace_id, worker_id))
+
+    def heartbeat(self, *, workspace_id: str, worker_id: str) -> None:
+        """Record one workspace heartbeat request."""
+
+        self.heartbeats.append((workspace_id, worker_id))
+
+
 def test_run_once_executes_claim_in_its_mapped_checkout(tmp_path: Path) -> None:
     """Each claimed workspace run is delegated to its configured checkout."""
 
@@ -65,6 +85,41 @@ def test_run_once_executes_claim_in_its_mapped_checkout(tmp_path: Path) -> None:
     assert claimed_count == 1
     assert client.calls == [('workspace-1', 'worker-1'), ('workspace-2', 'worker-1')]
     assert executions == [(claim, first_checkout)]
+
+
+def test_worker_registers_and_heartbeats_each_configured_workspace(
+    tmp_path: Path,
+) -> None:
+    """Registration precedes polling and heartbeats precede workspace claims."""
+
+    first_checkout = tmp_path / 'first'
+    second_checkout = tmp_path / 'second'
+    registration_client = FakeRegistrationClient()
+    worker = RuntimeWorker(
+        config=RuntimeConfig(
+            api_base_url='http://127.0.0.1:8000/api/v1', worker_id='worker-1',
+            poll_interval_seconds=1,
+            workspaces=(
+                WorkspaceCheckout('workspace-1', first_checkout),
+                WorkspaceCheckout('workspace-2', second_checkout),
+            ),
+        ),
+        claim_client=FakeClaimClient({'workspace-1': None, 'workspace-2': None}),
+        registration_client=registration_client,
+        execute_claim=lambda _claim, _checkout: None,
+    )
+
+    worker.register()
+    worker.run_once()
+
+    assert registration_client.registrations == [
+        ('workspace-1', 'worker-1'),
+        ('workspace-2', 'worker-1'),
+    ]
+    assert registration_client.heartbeats == [
+        ('workspace-1', 'worker-1'),
+        ('workspace-2', 'worker-1'),
+    ]
 
 
 def test_run_once_continues_after_one_workspace_execution_fails(
