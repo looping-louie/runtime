@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from config import load_config
+from configuration.runtime import load_config
 
 
 def write_config(tmp_path: Path, payload: dict[str, object]) -> Path:

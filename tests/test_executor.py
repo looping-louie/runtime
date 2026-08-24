@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from executor import ActivityExecutor
-from worker import ClaimedPipelineRun
+from runs.executor import ActivityExecutor
+from runs.models import ClaimedPipelineRun
 
 
 class FakeActivityClient:

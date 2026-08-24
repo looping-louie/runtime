@@ -7,10 +7,10 @@ import argparse
 from clients.activity_client import ActivityRunClient
 from clients.pipeline_client import PipelineRunClaimClient
 from clients.worker_client import WorkerHeartbeatClient
-from config import load_config
-from executor import ActivityExecutor
-from runner import run_forever
-from worker import RuntimeWorker
+from configuration.runtime import load_config
+from polling.loop import run_forever
+from polling.worker import RuntimeWorker
+from runs.executor import ActivityExecutor
 
 
 def main() -> None:

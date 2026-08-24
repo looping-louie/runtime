@@ -23,14 +23,10 @@ looping-louie-runtime = 'main:main'
 
 [tool.setuptools]
 package-dir = {'' = 'src'}
-py-modules = [
-	'config',
-	'executor',
-	'main',
-	'runner',
-	'worker',
-]
-packages = ['clients', 'services', 'services.git']
+py-modules = ['main']
+
+[tool.setuptools.packages.find]
+where = ['src']
 
 [tool.pytest.ini_options]
 asyncio_mode = 'auto'

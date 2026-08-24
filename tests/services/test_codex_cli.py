@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from services import codex_cli
+from harnesses.codex_cli import executor as codex_cli
 
 
 def test_execute_codex_cli_reports_completed_turn(

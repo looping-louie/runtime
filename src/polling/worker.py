@@ -4,25 +4,14 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from config import RuntimeConfig
+from configuration.runtime import RuntimeConfig
+from runs.models import ClaimedPipelineRun
 
 
 LOGGER = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True, slots=True)
-class ClaimedPipelineRun:
-    """A worker-owned API run and the lease token authorizing its execution."""
-
-    workspace_id: str
-    pipeline_id: str
-    run_id: str
-    lease_token: str
-    payload: dict[str, object]
 
 
 class ClaimClient(Protocol):

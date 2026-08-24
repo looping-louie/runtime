@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 from typing import Mapping
 
-from services.git.repository_context import get_changed_files, get_git_diff
+from services.checkout.changes import get_changed_files, get_git_diff
 
 
 def execute_codex_cli(response: Mapping[str, object], checkout_path: Path) -> dict[str, object]:

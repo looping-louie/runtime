@@ -7,7 +7,7 @@ from urllib.parse import quote
 
 import httpx
 
-from worker import ClaimedPipelineRun
+from runs.models import ClaimedPipelineRun
 
 
 class PipelineRunClaimClient:

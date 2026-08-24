@@ -7,8 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from config import RuntimeConfig, WorkspaceCheckout
-from worker import ClaimedPipelineRun, RuntimeWorker
+from configuration.runtime import RuntimeConfig, WorkspaceCheckout
+from polling.worker import RuntimeWorker
+from runs.models import ClaimedPipelineRun
 
 
 class FakeClaimClient:

@@ -7,22 +7,26 @@ from collections.abc import Callable
 from typing import Protocol
 from uuid import uuid4
 
-from services.git.file_operations import apply_file_operations
-from services.git.policy import commit_policy_error, load_git_policy
-from services.git.repository_context import (
-    build_project_profile,
-    build_repository_context,
+from services.checkout.changes import (
     get_changed_files,
-    commit_all,
-    get_current_branch,
     get_git_diff,
-    get_head_sha,
-    has_changes,
-    load_constitution,
     read_changed_file_contents,
 )
-from services.codex_cli import execute_codex_cli
-from worker import ClaimedPipelineRun
+from services.checkout.operations import apply_file_operations
+from services.checkout.policy import commit_policy_error, load_git_policy
+from services.checkout.repository import (
+    commit_all,
+    get_current_branch,
+    get_head_sha,
+    has_changes,
+)
+from services.checkout.snapshot import (
+    build_project_profile,
+    build_repository_context,
+    load_constitution,
+)
+from harnesses.codex_cli import execute_codex_cli
+from runs.models import ClaimedPipelineRun
 
 
 ACTIVITY_RUN_STATUSES = frozenset({'in_progress', 'completed', 'failed', 'stopped'})

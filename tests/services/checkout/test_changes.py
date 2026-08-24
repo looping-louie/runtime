@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from services.git.repository_context import get_changed_files, get_git_diff
+from services.checkout.changes import get_changed_files, get_git_diff
 
 
 def _git(checkout_path: Path, *arguments: str) -> str:
