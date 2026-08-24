@@ -7,25 +7,8 @@ from collections.abc import Callable
 from typing import Protocol
 from uuid import uuid4
 
-from services.checkout.changes import (
-    get_changed_files,
-    get_git_diff,
-    read_changed_file_contents,
-)
-from services.checkout.operations import apply_file_operations
-from services.checkout.policy import commit_policy_error, load_git_policy
-from services.checkout.repository import (
-    commit_all,
-    get_current_branch,
-    get_head_sha,
-    has_changes,
-)
-from services.checkout.snapshot import (
-    build_project_profile,
-    build_repository_context,
-    load_constitution,
-)
 from harnesses.codex_cli import execute_codex_cli
+from harnesses.louie import execute_louie_action, prepare_louie_execution
 from runs.models import ClaimedPipelineRun
 
 
@@ -105,7 +88,7 @@ class ActivityExecutor:
 
         pipeline_run = claim.payload
         _require_pipeline_response(pipeline_run)
-        policy = load_git_policy(checkout_path)
+        policy = prepare_louie_execution(checkout_path)
         while (child := pipeline_run.get('current_activity_run')) is not None:
             if not isinstance(child, dict):
                 raise RuntimeError('Pipeline run has an invalid current_activity_run.')
@@ -180,109 +163,13 @@ class ActivityExecutor:
         """Build one supported local checkpoint result for the current Activity state."""
 
         action = _require_text(response, 'next_action')
-        if action == 'collect_snapshot':
-            return {
-                'action': 'collect_snapshot',
-                'repo_context': build_repository_context(checkout_path),
-                'workspace_metadata': {
-                    'workspace_path': str(checkout_path),
-                    'source_commit_sha': get_head_sha(checkout_path),
-                },
-                'constitution': load_constitution(checkout_path),
-                'project_profile': build_project_profile(checkout_path),
-            }
-        if action == 'apply_operations':
-            return _apply_operations_result(response=response, checkout_path=checkout_path)
         if action == 'run_harness':
             return self._harness_runner(response, checkout_path)
-        if action == 'submit_review_input':
-            changed_files = get_changed_files(checkout_path)
-            return {
-                'action': 'submit_review_input',
-                'final_diff': get_git_diff(checkout_path),
-                'changed_file_contents': read_changed_file_contents(
-                    checkout_path,
-                    changed_files,
-                ),
-            }
-        if action == 'commit_if_allowed':
-            return _commit_result(
-                response=response,
-                checkout_path=checkout_path,
-                policy=policy,
-            )
-        raise RuntimeError(f'Unsupported runtime activity action: {action!r}.')
-
-
-def _apply_operations_result(
-    *,
-    response: dict[str, object],
-    checkout_path: Path,
-) -> dict[str, object]:
-    """Apply API operations and report the resulting checkout state."""
-
-    payload = response.get('payload')
-    operations = payload.get('operations') if isinstance(payload, dict) else None
-    if not isinstance(operations, list):
-        return {
-            'action': 'apply_operations',
-            'applied': True,
-            'final_diff': get_git_diff(checkout_path),
-            'changed_files': get_changed_files(checkout_path),
-        }
-    try:
-        apply_file_operations(checkout_path, operations)
-    except ValueError as exc:
-        return {'action': 'apply_operations', 'applied': False, 'error': str(exc)}
-    return {
-        'action': 'apply_operations',
-        'applied': True,
-        'final_diff': get_git_diff(checkout_path),
-        'changed_files': get_changed_files(checkout_path),
-    }
-
-
-def _commit_result(
-    *,
-    response: dict[str, object],
-    checkout_path: Path,
-    policy: dict[str, object],
-) -> dict[str, object]:
-    """Commit API-approved changes unless local checkout policy blocks the action."""
-
-    try:
-        policy_error = commit_policy_error(
+        return execute_louie_action(
+            response=response,
+            checkout_path=checkout_path,
             policy=policy,
-            current_branch=get_current_branch(checkout_path),
         )
-    except RuntimeError as exc:
-        return {'action': 'commit_if_allowed', 'committed': False, 'error': str(exc)}
-    if policy_error is not None:
-        return {'action': 'commit_if_allowed', 'committed': False, 'error': policy_error}
-    payload = response.get('payload')
-    commit_message = payload.get('commit_message') if isinstance(payload, dict) else None
-    if not isinstance(commit_message, str) or not commit_message.strip():
-        return {
-            'action': 'commit_if_allowed',
-            'committed': False,
-            'error': 'Activity run did not provide a commit_message.',
-        }
-    if not has_changes(checkout_path):
-        return {
-            'action': 'commit_if_allowed',
-            'committed': False,
-            'error': 'No repository changes were found to commit.',
-        }
-    try:
-        commit_sha = commit_all(checkout_path, commit_message)
-    except RuntimeError as exc:
-        return {'action': 'commit_if_allowed', 'committed': False, 'error': str(exc)}
-    return {
-        'action': 'commit_if_allowed',
-        'committed': True,
-        'commit_sha': commit_sha,
-        'commit_message': commit_message,
-    }
 
 
 def _require_text(value: dict[str, object], field_name: str) -> str:
