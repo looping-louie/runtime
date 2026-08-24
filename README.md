@@ -52,6 +52,9 @@ performs these checkpoint actions in the mapped checkout:
 	the checkout constitution to the API.
 - `apply_operations`: validates and atomically applies API-provided file
 	operations without permitting checkout escape or symbolic-link traversal.
+- `run_harness`: runs one frozen `codex_cli` v1 direct-loop turn through the
+  local Codex CLI and reports its final response, diff, changed files, usage,
+  diagnostics, and session reference to the API.
 - `submit_review_input`: sends the final Git diff and bounded changed-file
 	contents.
 - `commit_if_allowed`: enforces local `louie.yaml` Git policy, then commits an
@@ -74,3 +77,8 @@ The runtime never selects a checkout from an API response. It uses only the
 workspace-to-checkout mapping in its local configuration. Repository context
 collection is read-only and does not stage untracked files or otherwise modify
 the Git index.
+
+For `codex_cli`, the runtime reads local environment settings rather than
+Pipeline configuration: `LOUIE_CODEX_COMMAND` defaults to `codex`,
+`LOUIE_CODEX_SANDBOX` defaults to `workspace-write`, and
+`LOUIE_CODEX_TIMEOUT_SECONDS` defaults to `1800` seconds.

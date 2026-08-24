@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from collections.abc import Callable
 from typing import Protocol
 from uuid import uuid4
 
@@ -20,6 +21,7 @@ from services.git.repository_context import (
     load_constitution,
     read_changed_file_contents,
 )
+from services.codex_cli import execute_codex_cli
 from worker import ClaimedPipelineRun
 
 
@@ -86,11 +88,13 @@ class ActivityExecutor:
         *,
         activity_client: ActivityCheckpointClient,
         pipeline_client: PipelineContinuationClient,
+        harness_runner: Callable[[dict[str, object], Path], dict[str, object]] = execute_codex_cli,
     ) -> None:
         """Store the API clients used to complete Activity and Pipeline runs."""
 
         self._activity_client = activity_client
         self._pipeline_client = pipeline_client
+        self._harness_runner = harness_runner
 
     def execute_claim(self, claim: ClaimedPipelineRun, checkout_path: Path) -> None:
         """Execute the claimed child's supported checkpoint actions to completion."""
@@ -162,8 +166,8 @@ class ActivityExecutor:
             lease_token=claim.lease_token,
         )
 
-    @staticmethod
     def _action_result(
+        self,
         *,
         response: dict[str, object],
         checkout_path: Path,
@@ -185,6 +189,8 @@ class ActivityExecutor:
             }
         if action == 'apply_operations':
             return _apply_operations_result(response=response, checkout_path=checkout_path)
+        if action == 'run_harness':
+            return self._harness_runner(response, checkout_path)
         if action == 'submit_review_input':
             changed_files = get_changed_files(checkout_path)
             return {

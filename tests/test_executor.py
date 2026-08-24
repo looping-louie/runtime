@@ -340,6 +340,43 @@ def test_execute_claim_uses_the_policy_that_existed_before_operations(
     assert 'does not include commit' in str(commit_result['error'])
 
 
+def test_execute_claim_submits_harness_result(tmp_path: Path) -> None:
+    """The runtime submits an injected Harness result at a run_harness checkpoint."""
+
+    checkout = tmp_path / 'checkout'
+    checkout.mkdir()
+    activity_client = _HarnessActivityClient()
+    executor = ActivityExecutor(
+        activity_client=activity_client,
+        pipeline_client=_TerminalPipelineClient(),
+        harness_runner=lambda _response, _checkout: {
+            'action': 'run_harness',
+            'completed': True,
+            'final_response': 'Created the requested file.',
+        },
+    )
+    claim = ClaimedPipelineRun(
+        workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
+        lease_token='lease-1',
+        payload={
+            'status': 'claimed',
+            'current_activity_run': {
+                'id': 'activity-run-1',
+                'activity_id': 'activity-1',
+            },
+        },
+    )
+
+    executor.execute_claim(claim, checkout)
+
+    result = activity_client.continuations[0]['result']
+    assert result == {
+        'action': 'run_harness',
+        'completed': True,
+        'final_response': 'Created the requested file.',
+    }
+
+
 class _CompletedActivityClient:
     """Return an immediately completed state for each scheduled child run."""
 
@@ -370,6 +407,34 @@ class _CompletedActivityClient:
         """Reject checkpoint continuation because this test uses terminal children."""
 
         raise AssertionError(f'Unexpected Activity continuation: {payload}')
+
+
+class _HarnessActivityClient:
+    """Expose one Harness checkpoint and then complete the Activity."""
+
+    def __init__(self) -> None:
+        """Initialize the checkpoint submission log."""
+
+        self.continuations: list[dict[str, object]] = []
+
+    def get_run(self, **_payload: str) -> dict[str, object]:
+        """Return the frozen Codex Harness checkpoint response."""
+
+        return {
+            'status': 'in_progress',
+            'next_action': 'run_harness',
+            'continuation_token': 'token-1',
+            'input': 'Create the requested file.',
+            'payload': {
+                'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
+            },
+        }
+
+    def continue_run(self, **payload: object) -> dict[str, object]:
+        """Record the result and return the terminal Activity state."""
+
+        self.continuations.append(payload)
+        return {'status': 'completed', 'next_action': 'none'}
 
 
 class _InvalidStatusActivityClient:
