@@ -37,8 +37,8 @@ def execute_louie_action(
         return {
             'action': 'collect_snapshot',
             'repo_context': build_repository_context(checkout_path),
-            'workspace_metadata': {
-                'workspace_path': str(checkout_path),
+            'checkout_metadata': {
+                'checkout_path': str(checkout_path),
                 'source_commit_sha': get_head_sha(checkout_path),
             },
             'constitution': load_constitution(checkout_path),

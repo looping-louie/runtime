@@ -175,7 +175,7 @@ def test_execute_claim_submits_repository_snapshot(tmp_path: Path) -> None:
     result = client.continuations[0]['result']
     assert isinstance(result, dict)
     assert result['action'] == 'collect_snapshot'
-    assert result['workspace_metadata']['workspace_path'] == str(checkout)
+    assert result['checkout_metadata']['checkout_path'] == str(checkout)
     assert 'README.md' in result['repo_context']
     assert 'notes.md' in result['repo_context']
     applied_result = client.continuations[1]['result']
