@@ -22,7 +22,7 @@ class ActivityCheckpointClient(Protocol):
     def get_run(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         activity_id: str,
         run_id: str,
     ) -> dict[str, object]:
@@ -31,7 +31,7 @@ class ActivityCheckpointClient(Protocol):
     def continue_run(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         activity_id: str,
         run_id: str,
         pipeline_run_id: str,
@@ -49,7 +49,7 @@ class PipelineContinuationClient(Protocol):
     def continue_run(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         pipeline_id: str,
         run_id: str,
         lease_token: str,
@@ -59,7 +59,7 @@ class PipelineContinuationClient(Protocol):
     def renew_lease(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         pipeline_id: str,
         run_id: str,
         lease_token: str,
@@ -100,7 +100,7 @@ class ActivityExecutor:
             )
             self._renew_lease(claim)
             pipeline_run = self._pipeline_client.continue_run(
-                workspace_id=claim.workspace_id,
+                project_id=claim.project_id,
                 pipeline_id=claim.pipeline_id,
                 run_id=claim.run_id,
                 lease_token=claim.lease_token,
@@ -120,7 +120,7 @@ class ActivityExecutor:
         activity_id = _require_text(child, 'activity_id')
         run_id = _require_text(child, 'id')
         response = self._activity_client.get_run(
-            workspace_id=claim.workspace_id,
+            project_id=claim.project_id,
             activity_id=activity_id,
             run_id=run_id,
         )
@@ -128,7 +128,7 @@ class ActivityExecutor:
         while response.get('status') == 'in_progress':
             self._renew_lease(claim)
             response = self._activity_client.continue_run(
-                workspace_id=claim.workspace_id,
+                project_id=claim.project_id,
                 activity_id=activity_id,
                 run_id=run_id,
                 pipeline_run_id=claim.run_id,
@@ -147,7 +147,7 @@ class ActivityExecutor:
         """Keep the current worker lease active before mutating API state."""
 
         self._pipeline_client.renew_lease(
-            workspace_id=claim.workspace_id,
+            project_id=claim.project_id,
             pipeline_id=claim.pipeline_id,
             run_id=claim.run_id,
             lease_token=claim.lease_token,

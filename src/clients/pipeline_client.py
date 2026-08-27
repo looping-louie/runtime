@@ -11,7 +11,7 @@ from runs.models import ClaimedPipelineRun
 
 
 class PipelineRunClaimClient:
-    """Claim queued Pipeline runs for configured runtime workspaces."""
+    """Claim queued Pipeline runs for configured runtime projects."""
 
     def __init__(
         self,
@@ -27,18 +27,18 @@ class PipelineRunClaimClient:
     def claim_next(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         worker_id: str,
     ) -> ClaimedPipelineRun | None:
         """Claim one candidate run or return None when no work is available."""
 
-        for pipeline_id in self._active_pipeline_ids(workspace_id=workspace_id):
+        for pipeline_id in self._active_pipeline_ids(project_id=project_id):
             for candidate in self._claimable_runs(
-                workspace_id=workspace_id,
+                project_id=project_id,
                 pipeline_id=pipeline_id,
             ):
                 claim = self._claim_candidate(
-                    workspace_id=workspace_id,
+                    project_id=project_id,
                     pipeline_id=pipeline_id,
                     candidate=candidate,
                     worker_id=worker_id,
@@ -47,14 +47,14 @@ class PipelineRunClaimClient:
                     return claim
         return None
 
-    def _active_pipeline_ids(self, *, workspace_id: str) -> list[str]:
-        """Return every active Pipeline ID visible in the selected workspace."""
+    def _active_pipeline_ids(self, *, project_id: str) -> list[str]:
+        """Return every active Pipeline ID visible in the selected project."""
 
         try:
             response = self._client.get(
                 f'{self._api_base_url}/pipelines',
                 params={'status': 'active'},
-                headers={'X-Workspace-ID': workspace_id},
+                headers={'X-Project-ID': project_id},
             )
         except httpx.RequestError as exc:
             raise RuntimeError(f'Pipeline list request failed: {exc}') from exc
@@ -71,7 +71,7 @@ class PipelineRunClaimClient:
     def _claimable_runs(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         pipeline_id: str,
     ) -> list[dict[str, object]]:
         """Return the API-approved claim candidates for one Pipeline."""
@@ -81,7 +81,7 @@ class PipelineRunClaimClient:
             response = self._client.get(
                 f'{self._api_base_url}/pipelines/{encoded_pipeline_id}/runs',
                 params={'claimable': 'true'},
-                headers={'X-Workspace-ID': workspace_id},
+                headers={'X-Project-ID': project_id},
             )
         except httpx.RequestError as exc:
             raise RuntimeError(f'Claimable-run list request failed: {exc}') from exc
@@ -98,7 +98,7 @@ class PipelineRunClaimClient:
     def _claim_candidate(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         pipeline_id: str,
         candidate: dict[str, object],
         worker_id: str,
@@ -119,7 +119,7 @@ class PipelineRunClaimClient:
                 json={'worker_id': worker_id, 'status': 'claimed'},
                 headers={
                     'If-Match': etag,
-                    'X-Workspace-ID': workspace_id,
+                    'X-Project-ID': project_id,
                 },
             )
         except httpx.RequestError as exc:
@@ -131,12 +131,12 @@ class PipelineRunClaimClient:
                 f'Runtime claim request returned HTTP {response.status_code}: '
                 f'{response.text}'
             )
-        return self._to_claim(response.json(), workspace_id=workspace_id)
+        return self._to_claim(response.json(), project_id=project_id)
 
     def continue_run(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         pipeline_id: str,
         run_id: str,
         lease_token: str,
@@ -148,7 +148,7 @@ class PipelineRunClaimClient:
                 f'{self._api_base_url}/pipelines/{quote(pipeline_id, safe="")}/runs/'
                 f'{quote(run_id, safe="")}/continue',
                 json={'lease_token': lease_token},
-                headers={'X-Workspace-ID': workspace_id},
+                headers={'X-Project-ID': project_id},
             )
         except httpx.RequestError as exc:
             raise RuntimeError(f'Pipeline continuation request failed: {exc}') from exc
@@ -165,7 +165,7 @@ class PipelineRunClaimClient:
     def renew_lease(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         pipeline_id: str,
         run_id: str,
         lease_token: str,
@@ -177,7 +177,7 @@ class PipelineRunClaimClient:
                 f'{self._api_base_url}/pipelines/{quote(pipeline_id, safe="")}/runs/'
                 f'{quote(run_id, safe="")}/lease',
                 json={'lease_token': lease_token},
-                headers={'X-Workspace-ID': workspace_id},
+                headers={'X-Project-ID': project_id},
             )
         except httpx.RequestError as exc:
             raise RuntimeError(f'Pipeline lease renewal request failed: {exc}') from exc
@@ -191,7 +191,7 @@ class PipelineRunClaimClient:
             raise RuntimeError('Pipeline lease renewal response is missing lease_expires_at.')
 
     @staticmethod
-    def _to_claim(value: Any, *, workspace_id: str) -> ClaimedPipelineRun | None:
+    def _to_claim(value: Any, *, project_id: str) -> ClaimedPipelineRun | None:
         """Validate and map one successful API claim response."""
 
         if not isinstance(value, dict):
@@ -207,7 +207,7 @@ class PipelineRunClaimClient:
         pipeline_id = _require_text(run, 'pipeline_id')
         run_id = _require_text(run, 'id')
         return ClaimedPipelineRun(
-            workspace_id=workspace_id, pipeline_id=pipeline_id,
+            project_id=project_id, pipeline_id=pipeline_id,
             run_id=run_id,
             lease_token=lease_token,
             payload=run,

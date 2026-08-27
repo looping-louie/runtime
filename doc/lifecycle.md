@@ -33,11 +33,11 @@ Only the API persists a transition such as `queued -> claimed`,
 
 ### Runtime
 
-The runtime is the local execution plane. It maps an API workspace identifier
+The runtime is the local execution plane. It maps an API project identifier
 to a configured clean Git checkout, then performs the API-directed checkpoint
 actions in that checkout. Its responsibilities are:
 
-- Polling configured workspaces and claiming at most one run per workspace.
+- Polling configured projects and claiming at most one run per project.
 - Renewing the active Pipeline lease before every state-changing checkpoint.
 - Collecting bounded repository context.
 - Applying validated planned file operations.
@@ -70,7 +70,7 @@ sequenceDiagram
 
     C->>A: Create Pipeline run
     A-->>C: queued Pipeline run
-    R->>A: Claim next workspace run
+    R->>A: Claim next project run
     A-->>R: claimed run, Activity child, lease token
     R->>G: Collect repository snapshot
     R->>A: collect_snapshot checkpoint and lease token
@@ -99,8 +99,8 @@ API
 
 ### 2. Claim work
 
-The runtime polls each configured workspace. The API selects one claimable run
-for that workspace, records a lease token and expiry, and returns the selected
+The runtime polls each configured project. The API selects one claimable run
+for that project, records a lease token and expiry, and returns the selected
 Activity child.
 
 ```text
@@ -126,7 +126,7 @@ durable state.
 Runtime
   -> POST /activities/{activity_id}/runs/{run_id}/continue
 API
-  -> validates workspace, Pipeline lease, continuation token, and idempotency
+  -> validates project, Pipeline lease, continuation token, and idempotency
   -> persists next Activity state
   -> returns the next action or a terminal Activity state
 ```
@@ -279,7 +279,7 @@ failure. When a worker disappears, lease expiry makes the run claimable again.
 
 A non-retryable failure must instead become terminal. Otherwise an
 oldest-first queue repeatedly reclaims the same invalid run and blocks every
-later run in that workspace.
+later run in that project.
 
 ```text
 Oldest queued or expired run is permanently invalid

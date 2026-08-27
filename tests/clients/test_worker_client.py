@@ -8,7 +8,7 @@ from clients.worker_client import WorkerHeartbeatClient
 
 
 def test_worker_client_heartbeats_provisioned_workspace_worker() -> None:
-    """Worker heartbeat selects the configured workspace and worker ID."""
+    """Worker heartbeat selects the configured project and worker ID."""
 
     requests: list[httpx.Request] = []
 
@@ -23,12 +23,12 @@ def test_worker_client_heartbeats_provisioned_workspace_worker() -> None:
         client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
 
-    client.heartbeat(workspace_id='workspace-1', worker_id='worker-1')
+    client.heartbeat(project_id='project-1', worker_id='worker-1')
 
     assert [(request.method, request.url.path) for request in requests] == [
         ('POST', '/api/v1/workers/worker-1/heartbeat'),
     ]
     assert all(
-        request.headers['X-Workspace-ID'] == 'workspace-1'
+        request.headers['X-Project-ID'] == 'project-1'
         for request in requests
     )

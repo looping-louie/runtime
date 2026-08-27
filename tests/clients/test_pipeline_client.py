@@ -18,7 +18,7 @@ def test_claim_next_discovers_and_conditionally_claims_a_run() -> None:
         """Return the nested Pipeline claim protocol responses in order."""
 
         requests.append(request)
-        assert request.headers['X-Workspace-ID'] == 'workspace-1'
+        assert request.headers['X-Project-ID'] == 'project-1'
         if request.method == 'GET' and request.url.path == '/api/v1/pipelines':
             assert request.url.params['status'] == 'active'
             return httpx.Response(200, json={'items': [{'id': 'pipeline-1'}], 'total': 1})
@@ -47,10 +47,10 @@ def test_claim_next_discovers_and_conditionally_claims_a_run() -> None:
         client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
 
-    claim = client.claim_next(workspace_id='workspace-1', worker_id='worker-1')
+    claim = client.claim_next(project_id='project-1', worker_id='worker-1')
 
     assert claim is not None
-    assert claim.workspace_id == 'workspace-1'
+    assert claim.project_id == 'project-1'
     assert claim.pipeline_id == 'pipeline-1'
     assert claim.run_id == 'run-1'
     assert claim.lease_token == 'lease-1'
@@ -75,7 +75,7 @@ def test_claim_next_returns_none_when_no_pipeline_has_claimable_runs() -> None:
         ),
     )
 
-    assert client.claim_next(workspace_id='workspace-1', worker_id='worker-1') is None
+    assert client.claim_next(project_id='project-1', worker_id='worker-1') is None
 
 
 def test_claim_next_continues_after_another_worker_wins() -> None:
@@ -111,7 +111,7 @@ def test_claim_next_continues_after_another_worker_wins() -> None:
         client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
 
-    claim = client.claim_next(workspace_id='workspace-1', worker_id='worker-1')
+    claim = client.claim_next(project_id='project-1', worker_id='worker-1')
 
     assert claim is not None and claim.run_id == 'run-2'
     assert patch_count == 2
@@ -146,7 +146,7 @@ def test_continue_run_uses_workspace_scoped_contract() -> None:
         assert request.url == (
             'https://api.example/api/v1/pipelines/pipeline-1/runs/run-1/continue'
         )
-        assert request.headers['X-Workspace-ID'] == 'workspace-1'
+        assert request.headers['X-Project-ID'] == 'project-1'
         assert json.loads(request.content) == {'lease_token': 'lease-1'}
         return httpx.Response(
             200,
@@ -164,7 +164,7 @@ def test_continue_run_uses_workspace_scoped_contract() -> None:
     )
 
     response = client.continue_run(
-        workspace_id='workspace-1',
+        project_id='project-1',
         pipeline_id='pipeline-1',
         run_id='run-1',
         lease_token='lease-1',
@@ -174,7 +174,7 @@ def test_continue_run_uses_workspace_scoped_contract() -> None:
 
 
 def test_renew_lease_sends_the_active_claim_token() -> None:
-    """A runtime renewal uses the claimed run, workspace, and secret token."""
+    """A runtime renewal uses the claimed run, project, and secret token."""
 
     def handler(request: httpx.Request) -> httpx.Response:
         """Assert the renewal request follows the documented lease contract."""
@@ -183,7 +183,7 @@ def test_renew_lease_sends_the_active_claim_token() -> None:
         assert request.url == (
             'https://api.example/api/v1/pipelines/pipeline-1/runs/run-1/lease'
         )
-        assert request.headers['X-Workspace-ID'] == 'workspace-1'
+        assert request.headers['X-Project-ID'] == 'project-1'
         assert json.loads(request.content) == {'lease_token': 'lease-1'}
         return httpx.Response(200, json={'lease_expires_at': '2026-08-19T10:01:00Z'})
 
@@ -193,7 +193,7 @@ def test_renew_lease_sends_the_active_claim_token() -> None:
     )
 
     client.renew_lease(
-        workspace_id='workspace-1',
+        project_id='project-1',
         pipeline_id='pipeline-1',
         run_id='run-1',
         lease_token='lease-1',

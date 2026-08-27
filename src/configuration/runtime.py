@@ -1,4 +1,4 @@
-"""Load and validate runtime workspace checkout mappings."""
+"""Load and validate runtime project checkout mappings."""
 
 from __future__ import annotations
 
@@ -11,47 +11,47 @@ from urllib.parse import urlparse
 
 
 @dataclass(frozen=True, slots=True)
-class WorkspaceCheckout:
-    """One API workspace and the checkout a runtime may execute within."""
+class ProjectCheckout:
+    """One API project and the checkout a runtime may execute within."""
 
-    workspace_id: str
+    project_id: str
     worker_id: str
     repository_path: Path
 
 
 @dataclass(frozen=True, slots=True)
 class RuntimeConfig:
-    """Runtime connection settings and authorized workspace checkouts."""
+    """Runtime connection settings and authorized project checkouts."""
 
     api_base_url: str
     poll_interval_seconds: float
-    workspaces: tuple[WorkspaceCheckout, ...]
+    projects: tuple[ProjectCheckout, ...]
 
-    def checkout_for(self, workspace_id: str) -> WorkspaceCheckout:
-        """Return the configured checkout for one API workspace."""
+    def checkout_for(self, project_id: str) -> ProjectCheckout:
+        """Return the configured checkout for one API project."""
 
-        for workspace in self.workspaces:
-            if workspace.workspace_id == workspace_id:
-                return workspace
-        raise ValueError(f'No checkout is configured for workspace {workspace_id!r}.')
+        for project in self.projects:
+            if project.project_id == project_id:
+                return project
+        raise ValueError(f'No checkout is configured for project {project_id!r}.')
 
     def validate_checkouts(self) -> None:
         """Require every configured checkout to be an existing Git repository."""
 
-        for workspace in self.workspaces:
-            if not workspace.repository_path.is_dir():
+        for project in self.projects:
+            if not project.repository_path.is_dir():
                 raise ValueError(
-                    f'Checkout for workspace {workspace.workspace_id!r} does not exist: '
-                    f'{workspace.repository_path}'
+                    f'Checkout for project {project.project_id!r} does not exist: '
+                    f'{project.repository_path}'
                 )
-            if not (workspace.repository_path / '.git').exists():
+            if not (project.repository_path / '.git').exists():
                 raise ValueError(
-                    f'Checkout for workspace {workspace.workspace_id!r} is not a Git '
-                    f'repository: {workspace.repository_path}'
+                    f'Checkout for project {project.project_id!r} is not a Git '
+                    f'repository: {project.repository_path}'
                 )
-            if _has_uncommitted_changes(workspace.repository_path):
+            if _has_uncommitted_changes(project.repository_path):
                 raise ValueError(
-                    f'Checkout for workspace {workspace.workspace_id!r} contains '
+                    f'Checkout for project {project.project_id!r} contains '
                     'uncommitted changes.'
                 )
 
@@ -70,7 +70,7 @@ def load_config(path: str | Path) -> RuntimeConfig:
         raise ValueError('Runtime configuration must be a JSON object.')
     _reject_unknown_fields(
         raw,
-        {'api_base_url', 'poll_interval_seconds', 'workspaces'},
+        {'api_base_url', 'poll_interval_seconds', 'projects'},
         'Runtime configuration',
     )
     return RuntimeConfig(
@@ -78,42 +78,42 @@ def load_config(path: str | Path) -> RuntimeConfig:
         poll_interval_seconds=_require_positive_number(
             raw.get('poll_interval_seconds'), 'poll_interval_seconds',
         ),
-        workspaces=_parse_workspaces(raw.get('workspaces')),
+        projects=_parse_projects(raw.get('projects')),
     )
 
 
-def _parse_workspaces(value: object) -> tuple[WorkspaceCheckout, ...]:
-    """Validate distinct workspace mappings from JSON configuration."""
+def _parse_projects(value: object) -> tuple[ProjectCheckout, ...]:
+    """Validate distinct project mappings from JSON configuration."""
 
     if not isinstance(value, list) or not value:
-        raise ValueError('workspaces must be a non-empty array.')
-    workspaces: list[WorkspaceCheckout] = []
-    workspace_ids: set[str] = set()
+        raise ValueError('projects must be a non-empty array.')
+    projects: list[ProjectCheckout] = []
+    project_ids: set[str] = set()
     for index, item in enumerate(value):
         if not isinstance(item, dict):
-            raise ValueError(f'workspaces[{index}] must be an object.')
+            raise ValueError(f'projects[{index}] must be an object.')
         _reject_unknown_fields(
             item,
-            {'workspace_id', 'worker_id', 'repository_path'},
-            f'workspaces[{index}]',
+            {'project_id', 'worker_id', 'repository_path'},
+            f'projects[{index}]',
         )
-        workspace_id = _require_text(item.get('workspace_id'), f'workspaces[{index}].workspace_id')
-        if workspace_id in workspace_ids:
-            raise ValueError(f'workspaces contains duplicate workspace_id {workspace_id!r}.')
-        workspace_ids.add(workspace_id)
-        workspaces.append(
-            WorkspaceCheckout(
-                workspace_id=workspace_id,
-                worker_id=_require_text(item.get('worker_id'), f'workspaces[{index}].worker_id'),
+        project_id = _require_text(item.get('project_id'), f'projects[{index}].project_id')
+        if project_id in project_ids:
+            raise ValueError(f'projects contains duplicate project_id {project_id!r}.')
+        project_ids.add(project_id)
+        projects.append(
+            ProjectCheckout(
+                project_id=project_id,
+                worker_id=_require_text(item.get('worker_id'), f'projects[{index}].worker_id'),
                 repository_path=Path(
                     _require_text(
                         item.get('repository_path'),
-                        f'workspaces[{index}].repository_path',
+                        f'projects[{index}].repository_path',
                     )
                 ).expanduser(),
             )
         )
-    return tuple(workspaces)
+    return tuple(projects)
 
 
 def _require_http_url(value: object, field_name: str) -> str:

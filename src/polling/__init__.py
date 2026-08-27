@@ -1,4 +1,4 @@
-"""Polling and workspace-level claim coordination."""
+"""Polling and project-level claim coordination."""
 
 from .loop import run_forever
 from .worker import RuntimeWorker

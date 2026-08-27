@@ -25,22 +25,22 @@ class ActivityRunClient:
     def get_run(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         activity_id: str,
         run_id: str,
     ) -> dict[str, object]:
-        """Return one workspace-scoped Activity run from the API."""
+        """Return one project-scoped Activity run from the API."""
 
         return self._request(
             method='GET',
-            workspace_id=workspace_id,
+            project_id=project_id,
             path=self._run_path(activity_id=activity_id, run_id=run_id),
         )
 
     def continue_run(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         activity_id: str,
         run_id: str,
         pipeline_run_id: str,
@@ -53,7 +53,7 @@ class ActivityRunClient:
 
         return self._request(
             method='POST',
-            workspace_id=workspace_id,
+            project_id=project_id,
             path=f'{self._run_path(activity_id=activity_id, run_id=run_id)}/continue',
             payload={
                 'pipeline_run_id': pipeline_run_id,
@@ -68,7 +68,7 @@ class ActivityRunClient:
         self,
         *,
         method: str,
-        workspace_id: str,
+        project_id: str,
         path: str,
         payload: dict[str, object] | None = None,
     ) -> dict[str, object]:
@@ -79,7 +79,7 @@ class ActivityRunClient:
                 method,
                 f'{self._api_base_url}{path}',
                 json=payload,
-                headers={'X-Workspace-ID': workspace_id},
+                headers={'X-Project-ID': project_id},
             )
         except httpx.RequestError as exc:
             raise RuntimeError(f'Activity checkpoint request failed: {exc}') from exc

@@ -2,13 +2,13 @@
 
 ## Provisioning and heartbeat
 
-The API provisions a `worker_id` for each configured workspace. The runtime
-stores that identity in its workspace mapping and sends a heartbeat before each
-workspace poll.
+The API provisions a `worker_id` for each configured project. The runtime
+stores that identity in its project mapping and sends a heartbeat before each
+project poll.
 The API permits a PipelineRun claim only when that worker has sent a heartbeat
 within the active heartbeat window.
 
-Provisioning answers which durable worker identity may act in a workspace. A
+Provisioning answers which durable worker identity may act in a project. A
 heartbeat answers whether that identity is currently available. A
 PipelineRun lease answers whether that worker may mutate one specific run.
 They remain independent: a heartbeat does not extend a lease, and a lease
@@ -17,8 +17,8 @@ expires normally even when a worker stops heartbeating.
 A worker is a specific running instance of `looping-louie-runtime`. It is not
 a new kind of Pipeline, Activity, or ActivityRun.
 
-That identity is `WorkspaceCheckout.worker_id`. The API persists a durable
-workspace-scoped identity and recent heartbeat for it, then stores the ID on
+That identity is `ProjectCheckout.worker_id`. The API persists a durable
+project-scoped identity and recent heartbeat for it, then stores the ID on
 claimed `pipeline_runs`. Capabilities remain intentionally deferred: this slice
 does not claim that a registered worker can execute every possible future
 Activity type.
@@ -56,7 +56,7 @@ semantics.
 | Concern | Worker heartbeat | Pipeline-run lease |
 | --- | --- | --- |
 | Answers | Is this runtime instance currently available? | May this instance mutate this specific run? |
-| Scope | Worker, likely per configured workspace | One PipelineRun |
+| Scope | Worker, likely per configured project | One PipelineRun |
 | Expiry consequence | Stop admitting new claims to that worker | Another worker may reclaim the stalled run |
 | Renewal | Periodic background heartbeat | Before execution-changing API calls |
 
@@ -73,7 +73,7 @@ worker polls
   -> API verifies:
       provisioned and heartbeat fresh
        heartbeat fresh
-       authorized for workspace
+       authorized for project
        capable of the selected runtime Activity
   -> API issues the normal run lease
 ```
@@ -89,7 +89,7 @@ runtime work. A conservative capability declaration could be:
 ```json
 {
   "worker_id": "runtime-local-01",
-  "workspaces": ["workspace-acme"],
+  "projects": ["project-acme"],
   "activity_types": [
     "direct_loop",
     "refinement_loop",
@@ -127,16 +127,16 @@ flowchart LR
 ## Recommended First Step
 
 All current runtime Activity types use the same runtime executable and
-checkpoint protocol. The configured workspace mapping already constrains each
+checkpoint protocol. The configured project mapping already constrains each
 runtime to repositories it may execute. Provisioning and heartbeat therefore
 provide useful liveness and observability, while capability filtering should
 wait for a concrete routing requirement, such as different model-provider
 access, platform tooling, network or credential boundaries, execution engines,
-or workspace-specific worker pools.
+or project-specific worker pools.
 
 The narrow first implementation is:
 
-1. Provision one worker identity per workspace with a heartbeat timestamp.
+1. Provision one worker identity per project with a heartbeat timestamp.
 2. Require an active heartbeat for a runtime claim.
 3. Keep Pipeline-run leases unchanged.
 4. Do not add capabilities until a real runtime difference requires them.

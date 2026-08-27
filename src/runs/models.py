@@ -9,7 +9,7 @@ from dataclasses import dataclass
 class ClaimedPipelineRun:
     """A worker-owned API run and the lease token authorizing its execution."""
 
-    workspace_id: str
+    project_id: str
     pipeline_id: str
     run_id: str
     lease_token: str

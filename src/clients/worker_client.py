@@ -21,12 +21,12 @@ class WorkerHeartbeatClient:
         self._api_base_url = api_base_url.rstrip('/')
         self._client = client or httpx.Client(timeout=60.0)
 
-    def heartbeat(self, *, workspace_id: str, worker_id: str) -> None:
+    def heartbeat(self, *, project_id: str, worker_id: str) -> None:
         """Record a liveness heartbeat for one registered runtime worker."""
 
         self._request(
             method='POST',
-            workspace_id=workspace_id,
+            project_id=project_id,
             worker_id=worker_id,
         )
 
@@ -34,7 +34,7 @@ class WorkerHeartbeatClient:
         self,
         *,
         method: str,
-        workspace_id: str,
+        project_id: str,
         worker_id: str,
     ) -> None:
         """Submit one worker lifecycle request and require a successful response."""
@@ -43,7 +43,7 @@ class WorkerHeartbeatClient:
             response = self._client.request(
                 method,
                 f'{self._api_base_url}/workers/{quote(worker_id, safe="")}/heartbeat',
-                headers={'X-Workspace-ID': workspace_id},
+                headers={'X-Project-ID': project_id},
             )
         except httpx.RequestError as exc:
             raise RuntimeError(f'Worker lifecycle request failed: {exc}') from exc

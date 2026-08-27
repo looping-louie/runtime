@@ -63,14 +63,14 @@ class FakeActivityClient:
     def get_run(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         activity_id: str,
         run_id: str,
     ) -> dict[str, object]:
         """Return the pending snapshot checkpoint for the claimed child run."""
 
-        assert (workspace_id, activity_id, run_id) == (
-            'workspace-1',
+        assert (project_id, activity_id, run_id) == (
+            'project-1',
             'activity-1',
             'activity-run-1',
         )
@@ -119,7 +119,7 @@ class FakePipelineClient:
     def continue_run(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         pipeline_id: str,
         run_id: str,
         lease_token: str,
@@ -128,7 +128,7 @@ class FakePipelineClient:
 
         self.continuations.append(
             {
-                'workspace_id': workspace_id,
+                'project_id': project_id,
                 'pipeline_id': pipeline_id,
                 'run_id': run_id,
                 'lease_token': lease_token,
@@ -158,7 +158,7 @@ def test_execute_claim_submits_repository_snapshot(tmp_path: Path) -> None:
         pipeline_client=_TerminalPipelineClient(),
     )
     claim = ClaimedPipelineRun(
-        workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
+        project_id='project-1', pipeline_id='pipeline-1', run_id='run-1',
         lease_token='lease-1',
         payload={
             'status': 'claimed',
@@ -209,7 +209,7 @@ def test_execute_claim_advances_pipeline_through_sequential_children(
         pipeline_client=pipeline_client,
     )
     claim = ClaimedPipelineRun(
-        workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
+        project_id='project-1', pipeline_id='pipeline-1', run_id='run-1',
         lease_token='lease-1',
         payload={
             'status': 'claimed',
@@ -228,13 +228,13 @@ def test_execute_claim_advances_pipeline_through_sequential_children(
     ]
     assert pipeline_client.continuations == [
         {
-            'workspace_id': 'workspace-1',
+            'project_id': 'project-1',
             'pipeline_id': 'pipeline-1',
             'run_id': 'run-1',
             'lease_token': 'lease-1',
         },
         {
-            'workspace_id': 'workspace-1',
+            'project_id': 'project-1',
             'pipeline_id': 'pipeline-1',
             'run_id': 'run-1',
             'lease_token': 'lease-1',
@@ -255,7 +255,7 @@ def test_execute_claim_rejects_invalid_activity_status_before_advancing_pipeline
         pipeline_client=pipeline_client,
     )
     claim = ClaimedPipelineRun(
-        workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
+        project_id='project-1', pipeline_id='pipeline-1', run_id='run-1',
         lease_token='lease-1',
         payload={
             'status': 'claimed',
@@ -284,7 +284,7 @@ def test_execute_claim_rejects_scheduler_response_without_current_child(
         pipeline_client=_MissingCurrentChildPipelineClient(),
     )
     claim = ClaimedPipelineRun(
-        workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
+        project_id='project-1', pipeline_id='pipeline-1', run_id='run-1',
         lease_token='lease-1',
         payload={
             'status': 'claimed',
@@ -321,7 +321,7 @@ def test_execute_claim_uses_the_policy_that_existed_before_operations(
         pipeline_client=_TerminalPipelineClient(),
     )
     claim = ClaimedPipelineRun(
-        workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
+        project_id='project-1', pipeline_id='pipeline-1', run_id='run-1',
         lease_token='lease-1',
         payload={
             'status': 'claimed',
@@ -356,7 +356,7 @@ def test_execute_claim_submits_harness_result(tmp_path: Path) -> None:
         },
     )
     claim = ClaimedPipelineRun(
-        workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
+        project_id='project-1', pipeline_id='pipeline-1', run_id='run-1',
         lease_token='lease-1',
         payload={
             'status': 'claimed',
@@ -388,13 +388,13 @@ class _CompletedActivityClient:
     def get_run(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         activity_id: str,
         run_id: str,
     ) -> dict[str, object]:
         """Return a completed Activity run for the requested scheduler child."""
 
-        assert workspace_id == 'workspace-1'
+        assert project_id == 'project-1'
         self.requested_runs.append((activity_id, run_id))
         return {
             'id': run_id,

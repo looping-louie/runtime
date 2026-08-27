@@ -6,13 +6,13 @@ in configured Git checkouts, and returns checkpoint results to the API.
 
 The runtime has no persistent database and does not make model, reviewer, or
 scheduling decisions. The API is the durable control plane. A runtime process
-is the local execution plane for the workspaces in its configuration.
+is the local execution plane for the projects in its configuration.
 
 ## System Boundary
 
 The runtime owns:
 
-- Mapping workspace IDs to explicitly configured local Git checkouts.
+- Mapping project IDs to explicitly configured local Git checkouts.
 - Inspecting repository state and collecting bounded context.
 - Applying validated filesystem operations.
 - Evaluating the local Git commit policy and creating allowed commits.
@@ -26,7 +26,7 @@ The API owns:
 - Lease issuance and stale-worker fencing.
 
 The runtime never accepts a checkout path from an API response. It selects a
-checkout only through its local workspace mapping.
+checkout only through its local project mapping.
 
 ## Execution Flow
 
@@ -40,8 +40,8 @@ R -->|Continue Pipeline with lease token| A
 A -->|Next Activity child or terminal state| R
 ```
 
-The worker polls at most one run per configured workspace per cycle. A
-`RuntimeError` in one workspace is logged without preventing other workspaces
+The worker polls at most one run per configured project per cycle. A
+`RuntimeError` in one project is logged without preventing other projects
 from being polled. The runner retries operational failures after the configured
 delay. Unexpected errors stop the process.
 
@@ -55,7 +55,7 @@ local Git operations have dedicated packages.
 src/
 |-- main.py                Builds configured clients, worker, and polling loop
 |-- config.py              Parses local configuration and validates checkouts
-|-- worker.py              Polls workspace queues and isolates workspace errors
+|-- worker.py              Polls project queues and isolates project errors
 |-- runner.py              Repeats bounded poll cycles with operational retry
 |-- clients/
 |   |-- pipeline_client.py
@@ -131,7 +131,7 @@ Apply the pre-execution local policy and commit eligible changes. Return the
 commit outcome, SHA, or denial reason.
 
 The executor validates Activity and Pipeline response fields that control local
-progress. Malformed responses stop the affected workspace rather than causing
+progress. Malformed responses stop the affected project rather than causing
 an implicit checkpoint or Pipeline completion.
 
 ## Local State and Git Boundaries
@@ -164,8 +164,8 @@ it persists an Activity or Pipeline transition. A runtime whose lease has
 expired, or whose claim has been replaced, cannot advance durable state.
 
 Operational HTTP, Git, validation, and checkpoint failures are normalized as
-`RuntimeError`. The worker records the workspace failure and continues polling
-other configured workspaces. The long-running runner retries another cycle
+`RuntimeError`. The worker records the project failure and continues polling
+other configured projects. The long-running runner retries another cycle
 after `poll_interval_seconds`.
 
 ## Architectural Inspection Points
@@ -176,7 +176,7 @@ drift:
 **Composition.** `main.py` remains wiring only; it does not acquire execution
 rules.
 
-**Polling.** `worker.py` remains responsible for workspace polling and error
+**Polling.** `worker.py` remains responsible for project polling and error
 isolation, not checkpoint behavior.
 
 **Checkpoint orchestration.** `executor.py` remains the orchestration point for

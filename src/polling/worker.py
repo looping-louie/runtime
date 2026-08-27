@@ -1,4 +1,4 @@
-"""Poll configured workspaces and delegate claimed pipeline runs."""
+"""Poll configured projects and delegate claimed pipeline runs."""
 
 from __future__ import annotations
 
@@ -15,12 +15,12 @@ LOGGER = logging.getLogger(__name__)
 
 
 class ClaimClient(Protocol):
-    """Obtain queued pipeline runs from the API for one workspace."""
+    """Obtain queued pipeline runs from the API for one project."""
 
     def claim_next(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         worker_id: str,
     ) -> ClaimedPipelineRun | None:
         """Return one claimed run or None when no work is available."""
@@ -29,12 +29,12 @@ class ClaimClient(Protocol):
 class WorkerHeartbeatClient(Protocol):
     """Refresh liveness signals for provisioned runtime identities."""
 
-    def heartbeat(self, *, workspace_id: str, worker_id: str) -> None:
+    def heartbeat(self, *, project_id: str, worker_id: str) -> None:
         """Record one worker liveness heartbeat."""
 
 
 class RuntimeWorker:
-    """Claim and execute at most one queued run from each mapped workspace."""
+    """Claim and execute at most one queued run from each mapped project."""
 
     def __init__(
         self,
@@ -44,7 +44,7 @@ class RuntimeWorker:
         heartbeat_client: WorkerHeartbeatClient | None = None,
         execute_claim: Callable[[ClaimedPipelineRun, Path], None],
     ) -> None:
-        """Store the workspace mapping, API client, and execution adapter."""
+        """Store the project mapping, API client, and execution adapter."""
 
         self._config = config
         self._claim_client = claim_client
@@ -52,27 +52,27 @@ class RuntimeWorker:
         self._execute_claim = execute_claim
 
     def run_once(self) -> int:
-        """Claim and delegate one available pipeline run for each workspace."""
+        """Claim and delegate one available pipeline run for each project."""
 
         claimed_count = 0
-        for workspace in self._config.workspaces:
+        for project in self._config.projects:
             try:
                 if self._heartbeat_client is not None:
                     self._heartbeat_client.heartbeat(
-                        workspace_id=workspace.workspace_id,
-                        worker_id=workspace.worker_id,
+                        project_id=project.project_id,
+                        worker_id=project.worker_id,
                     )
                 claim = self._claim_client.claim_next(
-                    workspace_id=workspace.workspace_id,
-                    worker_id=workspace.worker_id,
+                    project_id=project.project_id,
+                    worker_id=project.worker_id,
                 )
                 if claim is None:
                     continue
-                self._execute_claim(claim, workspace.repository_path)
+                self._execute_claim(claim, project.repository_path)
                 claimed_count += 1
             except RuntimeError:
                 LOGGER.exception(
-                    'Runtime worker failed for workspace %s; continuing with other workspaces.',
-                    workspace.workspace_id,
+                    'Runtime worker failed for project %s; continuing with other projects.',
+                    project.project_id,
                 )
         return claimed_count
