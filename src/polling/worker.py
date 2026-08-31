@@ -57,14 +57,15 @@ class RuntimeWorker:
         claimed_count = 0
         for project in self._config.projects:
             try:
+                worker_id = project.require_worker_id()
                 if self._heartbeat_client is not None:
                     self._heartbeat_client.heartbeat(
                         project_id=project.project_id,
-                        worker_id=project.worker_id,
+                        worker_id=worker_id,
                     )
                 claim = self._claim_client.claim_next(
                     project_id=project.project_id,
-                    worker_id=project.worker_id,
+                    worker_id=worker_id,
                 )
                 if claim is None:
                     continue

@@ -63,6 +63,7 @@ def test_run_once_executes_claim_in_its_mapped_checkout(tmp_path: Path) -> None:
     worker = RuntimeWorker(
         config=RuntimeConfig(
             api_base_url='http://127.0.0.1:8000/api/v1',
+            user_id='user-1',
             poll_interval_seconds=1,
             projects=(
                 ProjectCheckout('project-1', 'worker-1', first_checkout),
@@ -93,6 +94,7 @@ def test_worker_heartbeats_each_provisioned_workspace_worker(
     worker = RuntimeWorker(
         config=RuntimeConfig(
             api_base_url='http://127.0.0.1:8000/api/v1',
+            user_id='user-1',
             poll_interval_seconds=1,
             projects=(
                 ProjectCheckout('project-1', 'worker-1', first_checkout),
@@ -143,6 +145,7 @@ def test_run_once_continues_after_one_workspace_execution_fails(
     worker = RuntimeWorker(
         config=RuntimeConfig(
             api_base_url='http://127.0.0.1:8000/api/v1',
+            user_id='user-1',
             poll_interval_seconds=1,
             projects=(
                 ProjectCheckout('project-1', 'worker-1', first_checkout),

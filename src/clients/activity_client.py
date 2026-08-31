@@ -15,11 +15,13 @@ class ActivityRunClient:
         self,
         *,
         api_base_url: str,
+        user_id: str,
         client: httpx.Client | None = None,
     ) -> None:
         """Store the API endpoint and optionally inject an HTTP client for tests."""
 
         self._api_base_url = api_base_url.rstrip('/')
+        self._user_id = user_id
         self._client = client or httpx.Client(timeout=300.0)
 
     def get_run(
@@ -79,7 +81,10 @@ class ActivityRunClient:
                 method,
                 f'{self._api_base_url}{path}',
                 json=payload,
-                headers={'X-Project-ID': project_id},
+                headers={
+                    'X-Project-ID': project_id,
+                    'X-User-ID': self._user_id,
+                },
             )
         except httpx.RequestError as exc:
             raise RuntimeError(f'Activity checkpoint request failed: {exc}') from exc

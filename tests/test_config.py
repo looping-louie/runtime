@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from configuration.runtime import load_config
+from configuration.runtime import load_config, persist_worker_id
 
 
 def write_config(tmp_path: Path, payload: dict[str, object]) -> Path:
@@ -29,6 +29,7 @@ def test_load_config_resolves_workspace_checkout(tmp_path: Path) -> None:
             tmp_path,
             {
                 'api_base_url': 'http://127.0.0.1:8000/api/v1/',
+                'user_id': 'user-local',
                 'poll_interval_seconds': 2,
                 'projects': [
                     {
@@ -42,6 +43,7 @@ def test_load_config_resolves_workspace_checkout(tmp_path: Path) -> None:
     )
 
     assert config.api_base_url == 'http://127.0.0.1:8000/api/v1'
+    assert config.user_id == 'user-local'
     assert config.checkout_for('project-local').repository_path == checkout_path
     assert config.checkout_for('project-local').worker_id == 'worker-1'
 
@@ -53,6 +55,7 @@ def test_load_config_rejects_duplicate_workspace_mapping(tmp_path: Path) -> None
         tmp_path,
         {
             'api_base_url': 'http://127.0.0.1:8000/api/v1',
+            'user_id': 'user-local',
             'poll_interval_seconds': 2,
             'projects': [
                 {
@@ -73,6 +76,28 @@ def test_load_config_rejects_duplicate_workspace_mapping(tmp_path: Path) -> None
         load_config(path)
 
 
+def test_load_config_requires_user_identity(tmp_path: Path) -> None:
+    """API communication cannot start without an explicit acting User."""
+
+    path = write_config(
+        tmp_path,
+        {
+            'api_base_url': 'http://127.0.0.1:8000/api/v1',
+            'poll_interval_seconds': 2,
+            'projects': [
+                {
+                    'project_id': 'project-local',
+                    'worker_id': 'worker-1',
+                    'repository_path': '/checkout',
+                }
+            ],
+        },
+    )
+
+    with pytest.raises(ValueError, match='user_id'):
+        load_config(path)
+
+
 def test_validate_checkouts_requires_git_repository(tmp_path: Path) -> None:
     """A mapped directory must be a checkout before the runtime starts."""
 
@@ -83,6 +108,7 @@ def test_validate_checkouts_requires_git_repository(tmp_path: Path) -> None:
             tmp_path,
             {
                 'api_base_url': 'http://127.0.0.1:8000/api/v1',
+                'user_id': 'user-local',
                 'poll_interval_seconds': 2,
                 'projects': [
                     {
@@ -111,6 +137,7 @@ def test_validate_checkouts_rejects_dirty_git_repository(tmp_path: Path) -> None
             tmp_path,
             {
                 'api_base_url': 'http://127.0.0.1:8000/api/v1',
+                'user_id': 'user-local',
                 'poll_interval_seconds': 2,
                 'projects': [
                     {
@@ -138,6 +165,7 @@ def test_validate_checkouts_accepts_clean_git_repository(tmp_path: Path) -> None
             tmp_path,
             {
                 'api_base_url': 'http://127.0.0.1:8000/api/v1',
+                'user_id': 'user-local',
                 'poll_interval_seconds': 2,
                 'projects': [
                     {
@@ -151,3 +179,28 @@ def test_validate_checkouts_accepts_clean_git_repository(tmp_path: Path) -> None
     )
 
     config.validate_checkouts()
+
+
+def test_persist_worker_id_completes_initial_project_provisioning(tmp_path: Path) -> None:
+    """An API-generated worker ID is stored for subsequent runtime starts."""
+
+    path = write_config(
+        tmp_path,
+        {
+            'api_base_url': 'http://127.0.0.1:8000/api/v1',
+            'user_id': 'user-local',
+            'poll_interval_seconds': 2,
+            'projects': [
+                {
+                    'project_id': 'project-local',
+                    'repository_path': '/checkout',
+                }
+            ],
+        },
+    )
+
+    assert load_config(path).checkout_for('project-local').worker_id is None
+
+    persist_worker_id(path, project_id='project-local', worker_id='worker-1')
+
+    assert load_config(path).checkout_for('project-local').worker_id == 'worker-1'

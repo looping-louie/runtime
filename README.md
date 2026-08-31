@@ -7,17 +7,19 @@ Looping Louie API and executes them in configured local Git checkouts.
 
 Each worker maps API projects to local repository checkouts. This keeps a
 worker from executing a task in an arbitrary directory supplied by an API run.
-Provision one worker through `POST /api/v1/workers` for each project, then
-place the returned ID in that project mapping.
+The top-level `user_id` is propagated as `X-User-ID` on every API request.
+On the first normal start, each project without a `worker_id` is provisioned
+through `POST /api/v1/workers`; the API-generated ID is written back to this
+file immediately and reused on later starts.
 
 ```json
 {
 	"api_base_url": "http://127.0.0.1:8000/api/v1",
+	"user_id": "local-user",
 	"poll_interval_seconds": 2,
 	"projects": [
 		{
 			"project_id": "local-project",
-			"worker_id": "api-provisioned-worker-id",
 			"repository_path": "/absolute/path/to/checkout"
 		}
 	]
@@ -36,6 +38,12 @@ Start the worker from a normal terminal:
 ```sh
 looping-louie-runtime --config runtime.json
 ```
+
+During initial provisioning, the runtime always advertises `louie`. It also
+advertises `codex_cli` only when the configured `LOUIE_CODEX_COMMAND` passes
+both `--version` and `login status`. If Codex is installed after a Louie-only
+worker was created, remove that project's `worker_id` and start the runtime
+once to create and persist a new worker identity.
 
 The worker polls every configured project, claims at most one available run
 per project in each cycle, and waits for `poll_interval_seconds` before the

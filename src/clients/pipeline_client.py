@@ -17,12 +17,22 @@ class PipelineRunClaimClient:
         self,
         *,
         api_base_url: str,
+        user_id: str,
         client: httpx.Client | None = None,
     ) -> None:
         """Store the API endpoint and optionally inject an HTTP client for tests."""
 
         self._api_base_url = api_base_url.rstrip('/')
+        self._user_id = user_id
         self._client = client or httpx.Client(timeout=60.0)
+
+    def _headers(self, *, project_id: str) -> dict[str, str]:
+        """Return the User and Project identity propagated to the API."""
+
+        return {
+            'X-Project-ID': project_id,
+            'X-User-ID': self._user_id,
+        }
 
     def claim_next(
         self,
@@ -54,7 +64,7 @@ class PipelineRunClaimClient:
             response = self._client.get(
                 f'{self._api_base_url}/pipelines',
                 params={'status': 'active'},
-                headers={'X-Project-ID': project_id},
+                headers=self._headers(project_id=project_id),
             )
         except httpx.RequestError as exc:
             raise RuntimeError(f'Pipeline list request failed: {exc}') from exc
@@ -81,7 +91,7 @@ class PipelineRunClaimClient:
             response = self._client.get(
                 f'{self._api_base_url}/pipelines/{encoded_pipeline_id}/runs',
                 params={'claimable': 'true'},
-                headers={'X-Project-ID': project_id},
+                headers=self._headers(project_id=project_id),
             )
         except httpx.RequestError as exc:
             raise RuntimeError(f'Claimable-run list request failed: {exc}') from exc
@@ -118,8 +128,8 @@ class PipelineRunClaimClient:
                 f'{quote(run_id, safe="")}',
                 json={'worker_id': worker_id, 'status': 'claimed'},
                 headers={
+                    **self._headers(project_id=project_id),
                     'If-Match': etag,
-                    'X-Project-ID': project_id,
                 },
             )
         except httpx.RequestError as exc:
@@ -148,7 +158,7 @@ class PipelineRunClaimClient:
                 f'{self._api_base_url}/pipelines/{quote(pipeline_id, safe="")}/runs/'
                 f'{quote(run_id, safe="")}/continue',
                 json={'lease_token': lease_token},
-                headers={'X-Project-ID': project_id},
+                headers=self._headers(project_id=project_id),
             )
         except httpx.RequestError as exc:
             raise RuntimeError(f'Pipeline continuation request failed: {exc}') from exc
@@ -177,7 +187,7 @@ class PipelineRunClaimClient:
                 f'{self._api_base_url}/pipelines/{quote(pipeline_id, safe="")}/runs/'
                 f'{quote(run_id, safe="")}/lease',
                 json={'lease_token': lease_token},
-                headers={'X-Project-ID': project_id},
+                headers=self._headers(project_id=project_id),
             )
         except httpx.RequestError as exc:
             raise RuntimeError(f'Pipeline lease renewal request failed: {exc}') from exc

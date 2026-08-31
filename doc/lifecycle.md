@@ -39,6 +39,8 @@ to a configured clean Git checkout, then performs the API-directed checkpoint
 actions in that checkout. Its responsibilities are:
 
 - Polling configured projects and claiming at most one run per project.
+- Propagating the configured User identity in all API communication.
+- Provisioning each missing worker once with locally detected Harnesses.
 - Renewing the active Pipeline lease before every state-changing checkpoint.
 - Collecting bounded repository context.
 - Applying validated planned file operations.
@@ -53,6 +55,16 @@ actions in that checkout. Its responsibilities are:
 
 The runtime must never choose a checkout from an API response or update a
 Pipeline or Activity status in local storage.
+
+## Worker Provisioning And Polling
+
+For a project mapping without `worker_id`, the runtime checks the configured
+Codex executable and local login. It always supports `louie`; it adds
+`codex_cli` only when both checks succeed. The project is then registered
+through `POST /workers`, and the returned ID is persisted immediately in the
+runtime JSON. Later starts reuse that ID and follow the existing heartbeat and
+polling flow. All API requests carry the configured `X-User-ID` and the
+project-specific `X-Project-ID`.
 
 ## Normal Execution
 

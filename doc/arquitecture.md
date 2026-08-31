@@ -13,6 +13,8 @@ is the local execution plane for the projects in its configuration.
 The runtime owns:
 
 - Mapping project IDs to explicitly configured local Git checkouts.
+- Propagating the configured User identity on every API request.
+- Detecting local Harness capabilities and provisioning missing worker IDs.
 - Inspecting repository state and collecting bounded context.
 - Applying validated filesystem operations.
 - Evaluating the local Git commit policy and creating allowed commits.
@@ -45,6 +47,11 @@ The worker polls at most one run per configured project per cycle. A
 from being polled. The runner retries operational failures after the configured
 delay. Unexpected errors stop the process.
 
+When a project lacks a worker ID, the runtime detects whether the configured
+Codex executable is installed and authenticated, registers the worker once
+with the detected Harness set, and persists the returned API ID atomically in
+the runtime JSON.
+
 ## Source Structure
 
 Runtime source modules are grouped by ownership. Composition, polling, and
@@ -54,15 +61,16 @@ local Git operations have dedicated packages.
 ```text
 src/
 |-- main.py                Builds configured clients, worker, and polling loop
-|-- config.py              Parses local configuration and validates checkouts
-|-- worker.py              Polls project queues and isolates project errors
-|-- runner.py              Repeats bounded poll cycles with operational retry
+|-- configuration/         Parses configuration and persists provisioned IDs
+|-- provisioning.py        Creates missing workers and persists their IDs
+|-- polling/               Polls project queues with operational retry
 |-- clients/
 |   |-- pipeline_client.py
 |   |                       Claims, renews, and advances Pipeline runs over HTTP
 |   `-- activity_client.py Reads and checkpoints Activity runs over HTTP
 |-- executor.py            Coordinates local checkpoint execution for a claim
 |-- harnesses/
+|   |-- capabilities.py    Detects executable and authenticated Harnesses
 |   `-- codex_cli/         Runs Codex, materializes instructions, and captures
 |                          JSONL plus local-session observations
 |-- services/
@@ -93,13 +101,14 @@ tests/
 ### Composition
 
 `main.py` is the composition root. It loads and validates `RuntimeConfig`,
-creates the two HTTP clients, passes them to `ActivityExecutor`, and constructs
-`RuntimeWorker` with the executor callback. It then invokes `run_forever`.
+detects local Harnesses, provisions missing workers, creates the HTTP clients,
+passes them to `ActivityExecutor`, and constructs `RuntimeWorker` with the
+executor callback. It then invokes `run_forever`.
 
 Dependency flow is:
 
 ```text
-main -> config, clients, executor, worker, runner
+main -> configuration, capabilities, provisioning, clients, executor, polling
 worker -> ClaimClient, executor callback
 executor -> activity client, pipeline client, services.git
 clients -> HTTP API
@@ -161,8 +170,9 @@ an implicit checkpoint or Pipeline completion.
 
 ## Local State and Git Boundaries
 
-The runtime stores no run state locally. API Pipeline and Activity runs are the
-source of truth for progress, retry tokens, and scheduling.
+The runtime stores no run state locally. It persists only API-generated worker
+IDs in its configuration after initial provisioning. API Pipeline and Activity
+runs remain the source of truth for progress, retry tokens, and scheduling.
 
 The configured checkout is the local side-effect boundary. Before the worker
 starts, every checkout must be a clean Git repository. During execution:
