@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -29,6 +30,25 @@ def instruction_snapshot() -> dict[str, object]:
     }
 
 
+def completed_events(completion: dict[str, str]) -> str:
+    """Build Codex JSONL events around one structured final response."""
+
+    return '\n'.join((
+        json.dumps({'type': 'thread.started', 'thread_id': 'thread-1'}),
+        json.dumps({
+            'type': 'item.completed',
+            'item': {
+                'type': 'agent_message',
+                'text': json.dumps(completion),
+            },
+        }),
+        json.dumps({
+            'type': 'turn.completed',
+            'usage': {'input_tokens': 2, 'output_tokens': 3},
+        }),
+    )) + '\n'
+
+
 def test_execute_codex_cli_reports_completed_turn(
     monkeypatch: object,
     tmp_path: Path,
@@ -49,11 +69,10 @@ def test_execute_codex_cli_reports_completed_turn(
         return subprocess.CompletedProcess(
             args=command,
             returncode=0,
-            stdout=(
-                '{"type":"thread.started","thread_id":"thread-1"}\n'
-                '{"type":"item.completed","item":{"type":"agent_message","text":"Done."}}\n'
-                '{"type":"turn.completed","usage":{"input_tokens":2,"output_tokens":3}}\n'
-            ),
+            stdout=completed_events({
+                'final_response': 'Done.',
+                'commit_message': 'feat: complete requested change',
+            }),
             stderr='',
         )
 
@@ -66,6 +85,7 @@ def test_execute_codex_cli_reports_completed_turn(
             'input': 'Create a file.',
             'payload': {
                 'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
+                'commit_mode': 'allow',
                 'instruction_snapshot': instruction_snapshot(),
                 'repo_context': 'Repository context.',
                 'constitution': '',
@@ -78,6 +98,8 @@ def test_execute_codex_cli_reports_completed_turn(
     assert calls[0][0] == ['codex', 'exec', '--json', '--sandbox', 'workspace-write', '-']
     assert 'Persona instructions:\nMake the smallest coherent implementation.' in calls[0][1]['input']
     assert 'Apply these run-scoped Skills when relevant: $api-compatibility' in calls[0][1]['input']
+    assert 'Do not run git commit or otherwise create a commit.' in calls[0][1]['input']
+    assert '"commit_message": "feat: concise description"' in calls[0][1]['input']
     assert materialized_documents == [
         '---\n'
         'name: api-compatibility\n'
@@ -90,6 +112,7 @@ def test_execute_codex_cli_reports_completed_turn(
         'action': 'run_harness',
         'completed': True,
         'final_response': 'Done.',
+        'commit_message': 'feat: complete requested change',
         'final_diff': 'diff --git a/a b/a',
         'changed_files': ['a.txt'],
         'usage': {'input_tokens': 2, 'output_tokens': 3},
@@ -203,3 +226,78 @@ def test_execute_codex_cli_rejects_a_symlinked_agents_directory(
     assert 'not a directory' in str(result['error'])
     assert list(outside.iterdir()) == []
     assert calls == []
+
+
+def test_execute_codex_cli_rejects_missing_commit_message(
+    monkeypatch: object,
+    tmp_path: Path,
+) -> None:
+    """An allowed turn fails when Codex omits its commit proposal."""
+
+    def run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        """Return a successful turn without the required commit message."""
+
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=completed_events({'final_response': 'Done.'}),
+            stderr='',
+        )
+
+    monkeypatch.setattr(codex_cli.subprocess, 'run', run)
+
+    result = codex_cli.execute_codex_cli(
+        {
+            'input': 'Create a file.',
+            'payload': {
+                'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
+                'commit_mode': 'allow',
+                'instruction_snapshot': instruction_snapshot(),
+            },
+        },
+        tmp_path,
+    )
+
+    assert result['completed'] is False
+    assert 'expected commit_message, final_response' in str(result['error'])
+
+
+def test_execute_codex_cli_accepts_no_message_when_commit_is_forbidden(
+    monkeypatch: object,
+    tmp_path: Path,
+) -> None:
+    """A forbidden turn reports completion without inventing a commit message."""
+
+    calls: list[dict[str, object]] = []
+
+    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        """Return the structured completion allowed by forbid mode."""
+
+        calls.append(kwargs)
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=completed_events({'final_response': 'Done without commit.'}),
+            stderr='',
+        )
+
+    monkeypatch.setattr(codex_cli.subprocess, 'run', run)
+    monkeypatch.setattr(codex_cli, 'get_git_diff', lambda _path: '')
+    monkeypatch.setattr(codex_cli, 'get_changed_files', lambda _path: [])
+
+    result = codex_cli.execute_codex_cli(
+        {
+            'input': 'Inspect the project.',
+            'payload': {
+                'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
+                'commit_mode': 'forbid',
+                'instruction_snapshot': instruction_snapshot(),
+            },
+        },
+        tmp_path,
+    )
+
+    assert result['completed'] is True
+    assert result['final_response'] == 'Done without commit.'
+    assert 'commit_message' not in result
+    assert 'commit_message' not in str(calls[0]['input'])

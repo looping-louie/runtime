@@ -23,10 +23,16 @@ def execute_codex_cli(response: Mapping[str, object], checkout_path: Path) -> di
         if not command:
             raise ValueError('LOUIE_CODEX_COMMAND must not be empty.')
         snapshot = _require_instruction_snapshot(payload)
+        commit_forbidden = payload.get('commit_mode') == 'forbid'
         with materialize_instruction_snapshot(checkout_path, snapshot) as instructions:
             result = subprocess.run(
                 [command, 'exec', '--json', '--sandbox', _sandbox(), '-'],
-                input=_prompt(response, payload, instructions),
+                input=_prompt(
+                    response,
+                    payload,
+                    instructions,
+                    commit_forbidden=commit_forbidden,
+                ),
                 capture_output=True,
                 cwd=checkout_path,
                 text=True,
@@ -42,10 +48,14 @@ def execute_codex_cli(response: Mapping[str, object], checkout_path: Path) -> di
             'error': result.stderr.strip() or f'Codex exited with status {result.returncode}.',
         }
     try:
-        session_reference, final_response, usage, diagnostics = _parse_events(result.stdout)
+        session_reference, completion, usage, diagnostics = _parse_events(result.stdout)
+        final_response, commit_message = _parse_completion(
+            completion,
+            require_commit_message=not commit_forbidden,
+        )
     except ValueError as error:
         return {'action': 'run_harness', 'completed': False, 'error': str(error)}
-    return {
+    harness_result: dict[str, object] = {
         'action': 'run_harness',
         'completed': True,
         'final_response': final_response,
@@ -55,6 +65,9 @@ def execute_codex_cli(response: Mapping[str, object], checkout_path: Path) -> di
         'diagnostics': diagnostics,
         'session_reference': session_reference,
     }
+    if commit_message is not None:
+        harness_result['commit_message'] = commit_message
+    return harness_result
 
 
 def _require_payload(response: Mapping[str, object]) -> Mapping[str, object]:
@@ -91,6 +104,8 @@ def _prompt(
     response: Mapping[str, object],
     payload: Mapping[str, object],
     instructions: CodexInstructions,
+    *,
+    commit_forbidden: bool,
 ) -> str:
     """Build one bounded task prompt from the immutable activity checkpoint."""
 
@@ -103,9 +118,21 @@ def _prompt(
         if instructions.skill_names
         else 'No additional run-scoped Skills were selected.'
     )
+    completion_shape = {'final_response': 'Concise summary of the completed work.'}
+    if not commit_forbidden:
+        completion_shape['commit_message'] = 'feat: concise description'
     return '\n\n'.join((
         f'Persona instructions:\n{instructions.persona_instructions}',
         f'Selected Skills:\n{selected_skills}',
+        (
+            'Git commit boundary:\nDo not run git commit or otherwise create a '
+            'commit. Leave all changes in the working tree. The API and runtime '
+            'own commit authorization and execution.'
+        ),
+        (
+            'Completion contract:\nYour final response must be only this JSON '
+            f'object shape, without Markdown fences: {json.dumps(completion_shape)}'
+        ),
         f'Task:\n{input_text.strip()}',
         f'Repository context:\n{payload.get("repo_context", "")}',
         f'Constitution:\n{payload.get("constitution", "")}',
@@ -166,3 +193,39 @@ def _parse_events(stdout: str) -> tuple[str | None, str, dict[str, int], list[st
     if final_response is None:
         raise ValueError('Codex did not complete the turn.')
     return session_reference, final_response, usage, diagnostics
+
+
+def _parse_completion(
+    completion: str,
+    *,
+    require_commit_message: bool,
+) -> tuple[str, str | None]:
+    """Validate Codex's final machine-readable response and commit proposal."""
+
+    try:
+        parsed = json.loads(completion)
+    except json.JSONDecodeError as error:
+        raise ValueError('Codex final response is not valid JSON.') from error
+    if not isinstance(parsed, dict):
+        raise ValueError('Codex final response must be a JSON object.')
+    expected_keys = {'final_response', 'commit_message'} if require_commit_message else {
+        'final_response'
+    }
+    if set(parsed) != expected_keys:
+        raise ValueError(
+            'Codex final response has invalid keys; expected '
+            + ', '.join(sorted(expected_keys))
+            + '.'
+        )
+    final_response = parsed.get('final_response')
+    if not isinstance(final_response, str) or not final_response.strip():
+        raise ValueError('Codex final response summary must not be empty.')
+    commit_message = parsed.get('commit_message')
+    if require_commit_message and (
+        not isinstance(commit_message, str) or not commit_message.strip()
+    ):
+        raise ValueError('Codex final response commit_message must not be empty.')
+    return (
+        final_response.strip(),
+        commit_message.strip() if isinstance(commit_message, str) else None,
+    )

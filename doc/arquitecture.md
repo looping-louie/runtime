@@ -131,7 +131,10 @@ duration of the Codex process at `.agents/skills/<normalized-name>/SKILL.md`.
 Each selected Skill is referenced explicitly in the prompt by its normalized
 `$name`. Temporary Skill directories are removed before diff collection and
 are also removed when the process fails. A checkout-owned directory with the
-same Skill name is never overwritten.
+same Skill name is never overwritten. The prompt forbids Codex from creating a
+Git commit and requires a machine-readable final summary plus a commit proposal
+for commit-enabled runs. That proposal is submitted through `run_harness`; Git
+is executed only after the API returns `commit_if_allowed`.
 
 ### `submit_review_input`
 

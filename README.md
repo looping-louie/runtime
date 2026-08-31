@@ -55,9 +55,10 @@ performs these checkpoint actions in the mapped checkout:
 - `run_harness`: runs one frozen `codex_cli` v1 direct-loop turn through the
   local Codex CLI. It injects the frozen Persona into the prompt, temporarily
   materializes every frozen Skill as `.agents/skills/<name>/SKILL.md`, and
-  reports the final response, diff, changed files, usage, diagnostics, and
-  session reference to the API. The temporary Skill directories are removed
-  before the checkout diff is collected.
+  reports the final response, proposed commit message, diff, changed files,
+  usage, diagnostics, and session reference to the API. Codex is explicitly
+  instructed to leave changes uncommitted. The temporary Skill directories are
+  removed before the checkout diff is collected.
 - `submit_review_input`: sends the final Git diff and bounded changed-file
 	contents.
 - `commit_if_allowed`: enforces local `louie.yaml` Git policy, then commits an
@@ -90,3 +91,6 @@ Pipeline configuration: `LOUIE_CODEX_COMMAND` defaults to `codex`,
 `LOUIE_CODEX_TIMEOUT_SECONDS` defaults to `1800` seconds. Persona and Skill
 content comes only from the immutable Activity snapshot supplied by the API;
 the runtime does not fetch mutable instruction resources during execution.
+For commit-enabled runs, Codex must return a structured final response with a
+non-empty `commit_message`. The runtime submits that proposal to the API and
+performs Git only if the next checkpoint is `commit_if_allowed`.
