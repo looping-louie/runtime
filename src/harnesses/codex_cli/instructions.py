@@ -17,6 +17,7 @@ class CodexInstructions:
 
     persona_instructions: str
     skill_names: tuple[str, ...]
+    materialized_skills: tuple[dict[str, object], ...]
 
 
 @contextmanager
@@ -38,7 +39,7 @@ def materialize_instruction_snapshot(
                     created_roots.append(root)
                 elif root.is_symlink() or not root.is_dir():
                     raise ValueError(f'Codex Skill path is not a directory: {root}')
-            for name, description, content in skills:
+            for name, description, content, _, _ in skills:
                 target = skills_root / name
                 if target.exists() or target.is_symlink():
                     raise ValueError(
@@ -53,6 +54,14 @@ def materialize_instruction_snapshot(
         yield CodexInstructions(
             persona_instructions=persona_instructions,
             skill_names=tuple(skill[0] for skill in skills),
+            materialized_skills=tuple(
+                {
+                    'id': skill_id,
+                    'name': name,
+                    'version': version,
+                }
+                for name, _, _, skill_id, version in skills
+            ),
         )
     finally:
         for target in reversed(created_skills):
@@ -70,7 +79,7 @@ def materialize_instruction_snapshot(
 
 def _parse_snapshot(
     snapshot: Mapping[str, object],
-) -> tuple[str, tuple[tuple[str, str, str], ...]]:
+) -> tuple[str, tuple[tuple[str, str, str, str, int], ...]]:
     """Validate the API snapshot and normalize safe Codex Skill names."""
 
     if snapshot.get('snapshot_version') != 1:
@@ -84,7 +93,7 @@ def _parse_snapshot(
     raw_skills = snapshot.get('skills')
     if not isinstance(raw_skills, list):
         raise ValueError('Instruction snapshot Skills must be a list.')
-    skills: list[tuple[str, str, str]] = []
+    skills: list[tuple[str, str, str, str, int]] = []
     names: set[str] = set()
     for raw_skill in raw_skills:
         if not isinstance(raw_skill, Mapping):
@@ -92,6 +101,12 @@ def _parse_snapshot(
         name = _skill_name(raw_skill)
         description = raw_skill.get('description')
         content = raw_skill.get('content')
+        skill_id = raw_skill.get('id')
+        version = raw_skill.get('version')
+        if not isinstance(skill_id, str) or not skill_id.strip():
+            raise ValueError(f"Instruction snapshot Skill '{name}' has no ID.")
+        if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+            raise ValueError(f"Instruction snapshot Skill '{name}' has no version.")
         if not isinstance(description, str) or not description.strip():
             raise ValueError(f"Instruction snapshot Skill '{name}' has no description.")
         if not isinstance(content, str) or not content.strip():
@@ -99,7 +114,13 @@ def _parse_snapshot(
         if name in names:
             raise ValueError(f"Instruction snapshot contains duplicate Skill name '{name}'.")
         names.add(name)
-        skills.append((name, description.strip(), content.strip()))
+        skills.append((
+            name,
+            description.strip(),
+            content.strip(),
+            skill_id.strip(),
+            version,
+        ))
     return persona_instructions.strip(), tuple(skills)
 
 

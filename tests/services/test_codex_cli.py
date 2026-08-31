@@ -4,9 +4,28 @@ from __future__ import annotations
 
 import json
 import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
+
 from harnesses.codex_cli import executor as codex_cli
+
+
+@pytest.fixture(autouse=True)
+def stable_observation_clocks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make timestamps, duration, and Git heads deterministic in adapter tests."""
+
+    timestamps = iter((
+        datetime(2026, 8, 31, 10, 0, tzinfo=UTC),
+        datetime(2026, 8, 31, 10, 0, 0, 250000, tzinfo=UTC),
+    ))
+    ticks = iter((10.0, 10.25))
+    monkeypatch.setattr(codex_cli, '_utc_now', lambda: next(timestamps))
+    monkeypatch.setattr(codex_cli, '_monotonic', lambda: next(ticks))
+    monkeypatch.setattr(codex_cli, 'get_head_sha', lambda _path: 'source-sha')
+    monkeypatch.setattr(codex_cli, 'get_git_diff', lambda _path: '')
+    monkeypatch.setattr(codex_cli, 'get_changed_files', lambda _path: [])
 
 
 def instruction_snapshot() -> dict[str, object]:
@@ -25,6 +44,7 @@ def instruction_snapshot() -> dict[str, object]:
                 'name': 'API Compatibility',
                 'description': 'Preserve existing API contracts.',
                 'content': 'Keep public API contracts backwards compatible.',
+                'version': 3,
             },
         ],
     }
@@ -125,15 +145,27 @@ def test_execute_codex_cli_reports_completed_turn(
     assert result == {
         'action': 'run_harness',
         'completed': True,
+        'started_at': '2026-08-31T10:00:00+00:00',
+        'completed_at': '2026-08-31T10:00:00.250000+00:00',
+        'duration_ms': 250,
         'final_response': 'Done.',
         'commit_message': 'feat: complete requested change',
         'requested_model': 'gpt-5-codex',
         'actual_model': 'gpt-5.1-codex',
+        'reasoning_effort': None,
+        'session_reference': 'thread-1',
+        'exit_code': 0,
+        'materialized_skills': [{
+            'id': 'skill-api',
+            'name': 'api-compatibility',
+            'version': 3,
+        }],
+        'source_commit_sha': 'source-sha',
+        'final_commit_sha': 'source-sha',
         'final_diff': 'diff --git a/a b/a',
         'changed_files': ['a.txt'],
         'usage': {'input_tokens': 2, 'output_tokens': 3},
         'diagnostics': [],
-        'session_reference': 'thread-1',
     }
 
 
@@ -164,11 +196,16 @@ def test_execute_codex_cli_removes_materialized_skills_after_failure(
         tmp_path,
     )
 
-    assert result == {
-        'action': 'run_harness',
-        'completed': False,
-        'error': 'Codex failed.',
-    }
+    assert result['completed'] is False
+    assert result['error'] == 'Codex failed.'
+    assert result['exit_code'] == 1
+    assert result['source_commit_sha'] == 'source-sha'
+    assert result['final_commit_sha'] == 'source-sha'
+    assert result['materialized_skills'] == [{
+        'id': 'skill-api',
+        'name': 'api-compatibility',
+        'version': 3,
+    }]
     assert not (tmp_path / '.agents' / 'skills' / 'api-compatibility').exists()
 
 
@@ -322,6 +359,7 @@ def test_execute_codex_cli_accepts_no_message_when_commit_is_forbidden(
     assert result['final_response'] == 'Done without commit.'
     assert result['requested_model'] == 'gpt-5-codex'
     assert result['actual_model'] == 'gpt-5-codex'
+    assert result['exit_code'] == 0
     assert 'commit_message' not in result
     assert 'commit_message' not in str(calls[0]['input'])
 
@@ -353,9 +391,10 @@ def test_execute_codex_cli_rejects_a_missing_requested_model(
         tmp_path,
     )
 
-    assert result == {
-        'action': 'run_harness',
-        'completed': False,
-        'error': 'Activity response is missing its requested model.',
-    }
+    assert result['action'] == 'run_harness'
+    assert result['completed'] is False
+    assert result['error'] == 'Activity response is missing its requested model.'
+    assert result['started_at'] == '2026-08-31T10:00:00+00:00'
+    assert result['completed_at'] == '2026-08-31T10:00:00.250000+00:00'
+    assert result['duration_ms'] == 250
     assert calls == []

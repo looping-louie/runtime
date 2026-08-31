@@ -5,17 +5,31 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
+from time import monotonic
 from typing import Mapping
 
 from services.checkout.changes import get_changed_files, get_git_diff
+from services.checkout.repository import get_head_sha
 
 from .instructions import CodexInstructions, materialize_instruction_snapshot
+from .observations import enrich_with_session_settings, parse_codex_events
 
 
 def execute_codex_cli(response: Mapping[str, object], checkout_path: Path) -> dict[str, object]:
     """Run Codex in the mapped checkout and return the checkpoint result."""
 
+    started_at = _utc_now()
+    started_monotonic = _monotonic()
+    requested_model: str | None = None
+    source_commit_sha: str | None = None
+    materialized_skills: tuple[dict[str, object], ...] = ()
+    stdout = ''
+    stderr = ''
+    exit_code: int | None = None
+    error_message: str | None = None
+    commit_forbidden = False
     try:
         payload = _require_payload(response)
         _require_codex_harness(payload)
@@ -25,7 +39,9 @@ def execute_codex_cli(response: Mapping[str, object], checkout_path: Path) -> di
             raise ValueError('LOUIE_CODEX_COMMAND must not be empty.')
         snapshot = _require_instruction_snapshot(payload)
         commit_forbidden = payload.get('commit_mode') == 'forbid'
+        source_commit_sha = get_head_sha(checkout_path).strip()
         with materialize_instruction_snapshot(checkout_path, snapshot) as instructions:
+            materialized_skills = instructions.materialized_skills
             result = subprocess.run(
                 [
                     command,
@@ -49,38 +65,67 @@ def execute_codex_cli(response: Mapping[str, object], checkout_path: Path) -> di
                 timeout=_timeout_seconds(),
                 check=False,
             )
-    except (OSError, subprocess.TimeoutExpired, ValueError) as error:
-        return {'action': 'run_harness', 'completed': False, 'error': str(error)}
-    if result.returncode != 0:
-        return {
-            'action': 'run_harness',
-            'completed': False,
-            'error': result.stderr.strip() or f'Codex exited with status {result.returncode}.',
-        }
-    try:
-        session_reference, completion, usage, diagnostics, observed_model = (
-            _parse_events(result.stdout)
-        )
-        final_response, commit_message = _parse_completion(
-            completion,
-            require_commit_message=not commit_forbidden,
-        )
-    except ValueError as error:
-        return {'action': 'run_harness', 'completed': False, 'error': str(error)}
+        stdout = result.stdout
+        stderr = result.stderr
+        exit_code = result.returncode
+        if exit_code != 0:
+            error_message = (
+                stderr.strip() or f'Codex exited with status {exit_code}.'
+            )
+    except subprocess.TimeoutExpired as error:
+        stdout = _process_output(error.stdout)
+        stderr = _process_output(error.stderr)
+        error_message = str(error)
+    except (OSError, RuntimeError, ValueError) as error:
+        error_message = str(error)
+
+    observations = enrich_with_session_settings(parse_codex_events(stdout))
+    diagnostics = list(observations.diagnostics)
+    if stderr.strip() and stderr.strip() not in diagnostics:
+        diagnostics.append(stderr.strip())
+    final_response = ''
+    commit_message: str | None = None
+    if observations.completion is not None:
+        try:
+            final_response, commit_message = _parse_completion(
+                observations.completion,
+                require_commit_message=not commit_forbidden,
+            )
+        except ValueError as error:
+            diagnostics.append(str(error))
+            if error_message is None:
+                error_message = str(error)
+    elif error_message is None:
+        error_message = 'Codex did not complete the turn.'
+    if observations.parse_error is not None and error_message is None:
+        error_message = observations.parse_error
+
+    final_commit_sha, final_diff, changed_files = _checkout_state(checkout_path)
+    completed_at = _utc_now()
     harness_result: dict[str, object] = {
         'action': 'run_harness',
-        'completed': True,
+        'completed': error_message is None,
+        'started_at': started_at.isoformat(),
+        'completed_at': completed_at.isoformat(),
+        'duration_ms': max(0, round((_monotonic() - started_monotonic) * 1000)),
         'final_response': final_response,
         'requested_model': requested_model,
-        'actual_model': observed_model or requested_model,
-        'final_diff': get_git_diff(checkout_path),
-        'changed_files': get_changed_files(checkout_path),
-        'usage': usage,
+        'actual_model': observations.actual_model or requested_model,
+        'reasoning_effort': observations.reasoning_effort,
+        'session_reference': observations.session_reference,
+        'usage': observations.usage or {},
+        'exit_code': exit_code,
         'diagnostics': diagnostics,
-        'session_reference': session_reference,
+        'materialized_skills': list(materialized_skills),
+        'source_commit_sha': source_commit_sha,
+        'final_commit_sha': final_commit_sha,
+        'final_diff': final_diff,
+        'changed_files': changed_files,
     }
     if commit_message is not None:
         harness_result['commit_message'] = commit_message
+    if error_message is not None:
+        harness_result['error'] = error_message
     return harness_result
 
 
@@ -181,48 +226,37 @@ def _timeout_seconds() -> float:
     return timeout
 
 
-def _parse_events(
-    stdout: str,
-) -> tuple[str | None, str, dict[str, int], list[str], str | None]:
-    """Extract Codex's response, observations, and diagnostics from JSONL."""
+def _checkout_state(checkout_path: Path) -> tuple[str | None, str, list[str]]:
+    """Capture the final Git state without hiding the primary Harness result."""
 
-    session_reference: str | None = None
-    final_response: str | None = None
-    usage: dict[str, int] = {}
-    diagnostics: list[str] = []
-    observed_model: str | None = None
-    for line in stdout.splitlines():
-        if not line.strip():
-            continue
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError as error:
-            raise ValueError('Codex returned invalid JSONL output.') from error
-        if not isinstance(event, dict):
-            raise ValueError('Codex returned a non-object JSONL event.')
-        if event.get('type') == 'thread.started':
-            thread_id = event.get('thread_id')
-            session_reference = thread_id if isinstance(thread_id, str) and thread_id else None
-        if event.get('type') in ('thread.started', 'turn.started'):
-            event_model = event.get('model')
-            if isinstance(event_model, str) and event_model.strip():
-                observed_model = event_model.strip()
-        item = event.get('item')
-        if event.get('type') == 'item.completed' and isinstance(item, dict):
-            text = item.get('text')
-            if item.get('type') == 'agent_message' and isinstance(text, str):
-                final_response = text
-        if event.get('type') == 'turn.completed' and isinstance(event.get('usage'), dict):
-            usage = {
-                key: int(value)
-                for key, value in event['usage'].items()
-                if isinstance(key, str) and isinstance(value, (int, float))
-            }
-        if event.get('type') in ('error', 'turn.failed'):
-            diagnostics.append(str(event.get('message') or event.get('type')))
-    if final_response is None:
-        raise ValueError('Codex did not complete the turn.')
-    return session_reference, final_response, usage, diagnostics, observed_model
+    try:
+        return (
+            get_head_sha(checkout_path).strip(),
+            get_git_diff(checkout_path),
+            get_changed_files(checkout_path),
+        )
+    except RuntimeError:
+        return None, '', []
+
+
+def _process_output(value: bytes | str | None) -> str:
+    """Normalize partial subprocess output captured by a timeout."""
+
+    if isinstance(value, bytes):
+        return value.decode(errors='replace')
+    return value or ''
+
+
+def _utc_now() -> datetime:
+    """Return the wall-clock timestamp used by Harness observations."""
+
+    return datetime.now(UTC)
+
+
+def _monotonic() -> float:
+    """Return the monotonic clock used for elapsed Harness duration."""
+
+    return monotonic()
 
 
 def _parse_completion(

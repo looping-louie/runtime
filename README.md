@@ -56,8 +56,10 @@ performs these checkpoint actions in the mapped checkout:
   local Codex CLI. It injects the frozen Persona into the prompt, temporarily
   materializes every frozen Skill as `.agents/skills/<name>/SKILL.md`, and
   passes the API-frozen model through `codex exec --model`. It reports the final
-  response, requested and actual model, proposed commit message, diff, changed
-  files, usage, diagnostics, and session reference to the API. Codex is explicitly
+  response, timestamps and duration, requested and actual model, reasoning
+  effort, proposed commit message, process exit, versioned Skills, source and
+  final Git commits, diff, changed files, usage, diagnostics, and session
+  reference to the API. Codex is explicitly
   instructed to leave changes uncommitted. The temporary Skill directories are
   removed before the checkout diff is collected.
 - `submit_review_input`: sends the final Git diff and bounded changed-file
@@ -95,8 +97,12 @@ settings: `LOUIE_CODEX_COMMAND` defaults to `codex`,
 content comes only from the immutable Activity snapshot supplied by the API;
 the runtime does not fetch mutable instruction resources during execution.
 Codex/OpenAI authentication remains local to the CLI and does not use API
-Linked Services. When Codex startup JSONL exposes a model, the runtime records
-it as `actual_model`; otherwise the explicitly requested CLI model is recorded.
+Linked Services. The public JSONL stream supplies the session reference, token
+usage, response, and diagnostics. After the process exits, the runtime reads
+that session's local `turn_context` to observe the effective model and reasoning
+effort. If session metadata is unavailable, `actual_model` falls back to the
+explicit CLI model and `reasoning_effort` remains `null`. Non-zero exits and
+timeouts retain all JSONL observations emitted before failure.
 For commit-enabled runs, Codex must return a structured final response with a
 non-empty `commit_message`. The runtime submits that proposal to the API and
 performs Git only if the next checkpoint is `commit_if_allowed`.

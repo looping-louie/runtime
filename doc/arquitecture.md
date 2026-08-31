@@ -63,7 +63,8 @@ src/
 |   `-- activity_client.py Reads and checkpoints Activity runs over HTTP
 |-- executor.py            Coordinates local checkpoint execution for a claim
 |-- harnesses/
-|   `-- codex_cli/         Runs Codex and materializes run-scoped instructions
+|   `-- codex_cli/         Runs Codex, materializes instructions, and captures
+|                          JSONL plus local-session observations
 |-- services/
 |   `-- git/
 |       |-- repository_context.py  Inspects Git state and builds bounded context
@@ -136,10 +137,14 @@ same Skill name is never overwritten. The prompt forbids Codex from creating a
 Git commit and requires a machine-readable final summary plus a commit proposal
 for commit-enabled runs. That proposal is submitted through `run_harness`; Git
 is executed only after the API returns `commit_if_allowed`. Successful results
-also report `requested_model` and `actual_model`. A model observed in Codex
-startup JSONL is used as the actual value; otherwise the explicit CLI model is
-reported. Codex authentication remains local and API Linked Services are not
-used by this Harness.
+and failures report timestamps, duration, requested and actual model, reasoning
+effort, session reference, all token counters, exit code, diagnostics,
+materialized Skill versions, source and final Git SHAs, diff, changed files,
+and any final response. The public JSONL stream supplies partial turn data; the
+runtime supplements it with effective model and effort from the matching local
+Codex session `turn_context`. If that metadata is absent, the requested model is
+reported as actual and effort remains unknown. Codex authentication remains
+local and API Linked Services are not used by this Harness.
 
 ### `submit_review_input`
 
