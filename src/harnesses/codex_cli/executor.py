@@ -10,6 +10,8 @@ from typing import Mapping
 
 from services.checkout.changes import get_changed_files, get_git_diff
 
+from .instructions import CodexInstructions, materialize_instruction_snapshot
+
 
 def execute_codex_cli(response: Mapping[str, object], checkout_path: Path) -> dict[str, object]:
     """Run Codex in the mapped checkout and return the checkpoint result."""
@@ -20,15 +22,17 @@ def execute_codex_cli(response: Mapping[str, object], checkout_path: Path) -> di
         command = os.environ.get('LOUIE_CODEX_COMMAND', 'codex').strip()
         if not command:
             raise ValueError('LOUIE_CODEX_COMMAND must not be empty.')
-        result = subprocess.run(
-            [command, 'exec', '--json', '--sandbox', _sandbox(), '-'],
-            input=_prompt(response, payload),
-            capture_output=True,
-            cwd=checkout_path,
-            text=True,
-            timeout=_timeout_seconds(),
-            check=False,
-        )
+        snapshot = _require_instruction_snapshot(payload)
+        with materialize_instruction_snapshot(checkout_path, snapshot) as instructions:
+            result = subprocess.run(
+                [command, 'exec', '--json', '--sandbox', _sandbox(), '-'],
+                input=_prompt(response, payload, instructions),
+                capture_output=True,
+                cwd=checkout_path,
+                text=True,
+                timeout=_timeout_seconds(),
+                check=False,
+            )
     except (OSError, subprocess.TimeoutExpired, ValueError) as error:
         return {'action': 'run_harness', 'completed': False, 'error': str(error)}
     if result.returncode != 0:
@@ -72,13 +76,36 @@ def _require_codex_harness(payload: Mapping[str, object]) -> None:
         raise ValueError('Activity response does not select codex_cli v1.')
 
 
-def _prompt(response: Mapping[str, object], payload: Mapping[str, object]) -> str:
+def _require_instruction_snapshot(
+    payload: Mapping[str, object],
+) -> Mapping[str, object]:
+    """Return the immutable instruction snapshot supplied by the API."""
+
+    snapshot = payload.get('instruction_snapshot')
+    if not isinstance(snapshot, Mapping):
+        raise ValueError('Activity response is missing its instruction snapshot.')
+    return snapshot
+
+
+def _prompt(
+    response: Mapping[str, object],
+    payload: Mapping[str, object],
+    instructions: CodexInstructions,
+) -> str:
     """Build one bounded task prompt from the immutable activity checkpoint."""
 
     input_text = response.get('input')
     if not isinstance(input_text, str) or not input_text.strip():
         raise ValueError('Activity response is missing input.')
+    selected_skills = (
+        'Apply these run-scoped Skills when relevant: '
+        + ', '.join(f'${name}' for name in instructions.skill_names)
+        if instructions.skill_names
+        else 'No additional run-scoped Skills were selected.'
+    )
     return '\n\n'.join((
+        f'Persona instructions:\n{instructions.persona_instructions}',
+        f'Selected Skills:\n{selected_skills}',
         f'Task:\n{input_text.strip()}',
         f'Repository context:\n{payload.get("repo_context", "")}',
         f'Constitution:\n{payload.get("constitution", "")}',

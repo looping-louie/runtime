@@ -62,6 +62,8 @@ src/
 |   |                       Claims, renews, and advances Pipeline runs over HTTP
 |   `-- activity_client.py Reads and checkpoints Activity runs over HTTP
 |-- executor.py            Coordinates local checkpoint execution for a claim
+|-- harnesses/
+|   `-- codex_cli/         Runs Codex and materializes run-scoped instructions
 |-- services/
 |   `-- git/
 |       |-- repository_context.py  Inspects Git state and builds bounded context
@@ -120,6 +122,16 @@ data and the source commit SHA to the API.
 
 Validate and apply planned create, replace, replace-text, and delete
 operations. Return the application outcome, diff, and changed files.
+
+### `run_harness`
+
+Validate the API-frozen `codex_cli` Harness and instruction snapshot. Inject
+the Persona content into the task prompt and materialize each Skill for the
+duration of the Codex process at `.agents/skills/<normalized-name>/SKILL.md`.
+Each selected Skill is referenced explicitly in the prompt by its normalized
+`$name`. Temporary Skill directories are removed before diff collection and
+are also removed when the process fails. A checkout-owned directory with the
+same Skill name is never overwritten.
 
 ### `submit_review_input`
 

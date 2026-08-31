@@ -8,6 +8,27 @@ from pathlib import Path
 from harnesses.codex_cli import executor as codex_cli
 
 
+def instruction_snapshot() -> dict[str, object]:
+    """Build one immutable Persona and Skill snapshot from the API."""
+
+    return {
+        'snapshot_version': 1,
+        'persona': {
+            'id': 'persona-1',
+            'name': 'Implementer',
+            'content': 'Make the smallest coherent implementation.',
+        },
+        'skills': [
+            {
+                'id': 'skill-api',
+                'name': 'API Compatibility',
+                'description': 'Preserve existing API contracts.',
+                'content': 'Keep public API contracts backwards compatible.',
+            },
+        ],
+    }
+
+
 def test_execute_codex_cli_reports_completed_turn(
     monkeypatch: object,
     tmp_path: Path,
@@ -15,11 +36,16 @@ def test_execute_codex_cli_reports_completed_turn(
     """A successful JSONL Codex turn reports its response and checkout changes."""
 
     calls: list[tuple[list[str], dict[str, object]]] = []
+    materialized_documents: list[str] = []
 
     def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         """Return a deterministic Codex JSONL response without starting a process."""
 
         calls.append((command, kwargs))
+        materialized_documents.append(
+            (tmp_path / '.agents' / 'skills' / 'api-compatibility' / 'SKILL.md')
+            .read_text(encoding='utf-8')
+        )
         return subprocess.CompletedProcess(
             args=command,
             returncode=0,
@@ -40,6 +66,7 @@ def test_execute_codex_cli_reports_completed_turn(
             'input': 'Create a file.',
             'payload': {
                 'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
+                'instruction_snapshot': instruction_snapshot(),
                 'repo_context': 'Repository context.',
                 'constitution': '',
                 'project_profile': {},
@@ -49,6 +76,16 @@ def test_execute_codex_cli_reports_completed_turn(
     )
 
     assert calls[0][0] == ['codex', 'exec', '--json', '--sandbox', 'workspace-write', '-']
+    assert 'Persona instructions:\nMake the smallest coherent implementation.' in calls[0][1]['input']
+    assert 'Apply these run-scoped Skills when relevant: $api-compatibility' in calls[0][1]['input']
+    assert materialized_documents == [
+        '---\n'
+        'name: api-compatibility\n'
+        'description: "Preserve existing API contracts."\n'
+        '---\n\n'
+        'Keep public API contracts backwards compatible.\n'
+    ]
+    assert not (tmp_path / '.agents' / 'skills' / 'api-compatibility').exists()
     assert result == {
         'action': 'run_harness',
         'completed': True,
@@ -59,3 +96,110 @@ def test_execute_codex_cli_reports_completed_turn(
         'diagnostics': [],
         'session_reference': 'thread-1',
     }
+
+
+def test_execute_codex_cli_removes_materialized_skills_after_failure(
+    monkeypatch: object,
+    tmp_path: Path,
+) -> None:
+    """Run-scoped Skill files are removed when the Codex process fails."""
+
+    def run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        """Observe the temporary Skill and return a failed Codex process."""
+
+        skill_path = tmp_path / '.agents' / 'skills' / 'api-compatibility' / 'SKILL.md'
+        assert skill_path.is_file()
+        return subprocess.CompletedProcess(command, 1, stdout='', stderr='Codex failed.')
+
+    monkeypatch.setattr(codex_cli.subprocess, 'run', run)
+
+    result = codex_cli.execute_codex_cli(
+        {
+            'input': 'Create a file.',
+            'payload': {
+                'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
+                'instruction_snapshot': instruction_snapshot(),
+            },
+        },
+        tmp_path,
+    )
+
+    assert result == {
+        'action': 'run_harness',
+        'completed': False,
+        'error': 'Codex failed.',
+    }
+    assert not (tmp_path / '.agents' / 'skills' / 'api-compatibility').exists()
+
+
+def test_execute_codex_cli_preserves_an_existing_project_skill(
+    monkeypatch: object,
+    tmp_path: Path,
+) -> None:
+    """A run refuses to overwrite a checkout-owned Skill with the same name."""
+
+    skill_path = tmp_path / '.agents' / 'skills' / 'api-compatibility'
+    skill_path.mkdir(parents=True)
+    existing_document = skill_path / 'SKILL.md'
+    existing_document.write_text('Existing project Skill.\n', encoding='utf-8')
+    calls: list[list[str]] = []
+
+    def run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        """Record an unexpected subprocess invocation."""
+
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout='', stderr='')
+
+    monkeypatch.setattr(codex_cli.subprocess, 'run', run)
+
+    result = codex_cli.execute_codex_cli(
+        {
+            'input': 'Create a file.',
+            'payload': {
+                'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
+                'instruction_snapshot': instruction_snapshot(),
+            },
+        },
+        tmp_path,
+    )
+
+    assert result['completed'] is False
+    assert 'already exists' in str(result['error'])
+    assert existing_document.read_text(encoding='utf-8') == 'Existing project Skill.\n'
+    assert calls == []
+
+
+def test_execute_codex_cli_rejects_a_symlinked_agents_directory(
+    monkeypatch: object,
+    tmp_path: Path,
+) -> None:
+    """Run-scoped Skills cannot escape the checkout through `.agents`."""
+
+    outside = tmp_path / 'outside'
+    outside.mkdir()
+    (tmp_path / '.agents').symlink_to(outside, target_is_directory=True)
+    calls: list[list[str]] = []
+
+    def run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        """Record an unexpected subprocess invocation."""
+
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout='', stderr='')
+
+    monkeypatch.setattr(codex_cli.subprocess, 'run', run)
+
+    result = codex_cli.execute_codex_cli(
+        {
+            'input': 'Create a file.',
+            'payload': {
+                'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
+                'instruction_snapshot': instruction_snapshot(),
+            },
+        },
+        tmp_path,
+    )
+
+    assert result['completed'] is False
+    assert 'not a directory' in str(result['error'])
+    assert list(outside.iterdir()) == []
+    assert calls == []
