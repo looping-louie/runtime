@@ -76,6 +76,8 @@ def test_codex_commit_message_is_used_only_after_api_handoff(tmp_path: Path) -> 
             'completed': True,
             'final_response': 'Implemented the requested change.',
             'commit_message': 'feat: implement requested change',
+            'requested_model': 'gpt-5-codex',
+            'actual_model': 'gpt-5-codex',
         }
 
     executor = ActivityExecutor(

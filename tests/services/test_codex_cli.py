@@ -30,11 +30,18 @@ def instruction_snapshot() -> dict[str, object]:
     }
 
 
-def completed_events(completion: dict[str, str]) -> str:
+def completed_events(
+    completion: dict[str, str],
+    *,
+    actual_model: str | None = None,
+) -> str:
     """Build Codex JSONL events around one structured final response."""
 
+    thread_started = {'type': 'thread.started', 'thread_id': 'thread-1'}
+    if actual_model is not None:
+        thread_started['model'] = actual_model
     return '\n'.join((
-        json.dumps({'type': 'thread.started', 'thread_id': 'thread-1'}),
+        json.dumps(thread_started),
         json.dumps({
             'type': 'item.completed',
             'item': {
@@ -69,10 +76,13 @@ def test_execute_codex_cli_reports_completed_turn(
         return subprocess.CompletedProcess(
             args=command,
             returncode=0,
-            stdout=completed_events({
-                'final_response': 'Done.',
-                'commit_message': 'feat: complete requested change',
-            }),
+            stdout=completed_events(
+                {
+                    'final_response': 'Done.',
+                    'commit_message': 'feat: complete requested change',
+                },
+                actual_model='gpt-5.1-codex',
+            ),
             stderr='',
         )
 
@@ -86,6 +96,7 @@ def test_execute_codex_cli_reports_completed_turn(
             'payload': {
                 'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
                 'commit_mode': 'allow',
+                'requested_model': 'gpt-5-codex',
                 'instruction_snapshot': instruction_snapshot(),
                 'repo_context': 'Repository context.',
                 'constitution': '',
@@ -95,7 +106,10 @@ def test_execute_codex_cli_reports_completed_turn(
         tmp_path,
     )
 
-    assert calls[0][0] == ['codex', 'exec', '--json', '--sandbox', 'workspace-write', '-']
+    assert calls[0][0] == [
+        'codex', 'exec', '--json', '--model', 'gpt-5-codex',
+        '--sandbox', 'workspace-write', '-',
+    ]
     assert 'Persona instructions:\nMake the smallest coherent implementation.' in calls[0][1]['input']
     assert 'Apply these run-scoped Skills when relevant: $api-compatibility' in calls[0][1]['input']
     assert 'Do not run git commit or otherwise create a commit.' in calls[0][1]['input']
@@ -113,6 +127,8 @@ def test_execute_codex_cli_reports_completed_turn(
         'completed': True,
         'final_response': 'Done.',
         'commit_message': 'feat: complete requested change',
+        'requested_model': 'gpt-5-codex',
+        'actual_model': 'gpt-5.1-codex',
         'final_diff': 'diff --git a/a b/a',
         'changed_files': ['a.txt'],
         'usage': {'input_tokens': 2, 'output_tokens': 3},
@@ -141,6 +157,7 @@ def test_execute_codex_cli_removes_materialized_skills_after_failure(
             'input': 'Create a file.',
             'payload': {
                 'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
+                'requested_model': 'gpt-5-codex',
                 'instruction_snapshot': instruction_snapshot(),
             },
         },
@@ -180,6 +197,7 @@ def test_execute_codex_cli_preserves_an_existing_project_skill(
             'input': 'Create a file.',
             'payload': {
                 'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
+                'requested_model': 'gpt-5-codex',
                 'instruction_snapshot': instruction_snapshot(),
             },
         },
@@ -216,6 +234,7 @@ def test_execute_codex_cli_rejects_a_symlinked_agents_directory(
             'input': 'Create a file.',
             'payload': {
                 'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
+                'requested_model': 'gpt-5-codex',
                 'instruction_snapshot': instruction_snapshot(),
             },
         },
@@ -252,6 +271,7 @@ def test_execute_codex_cli_rejects_missing_commit_message(
             'payload': {
                 'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
                 'commit_mode': 'allow',
+                'requested_model': 'gpt-5-codex',
                 'instruction_snapshot': instruction_snapshot(),
             },
         },
@@ -291,6 +311,7 @@ def test_execute_codex_cli_accepts_no_message_when_commit_is_forbidden(
             'payload': {
                 'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
                 'commit_mode': 'forbid',
+                'requested_model': 'gpt-5-codex',
                 'instruction_snapshot': instruction_snapshot(),
             },
         },
@@ -299,5 +320,42 @@ def test_execute_codex_cli_accepts_no_message_when_commit_is_forbidden(
 
     assert result['completed'] is True
     assert result['final_response'] == 'Done without commit.'
+    assert result['requested_model'] == 'gpt-5-codex'
+    assert result['actual_model'] == 'gpt-5-codex'
     assert 'commit_message' not in result
     assert 'commit_message' not in str(calls[0]['input'])
+
+
+def test_execute_codex_cli_rejects_a_missing_requested_model(
+    monkeypatch: object,
+    tmp_path: Path,
+) -> None:
+    """The runtime never falls back to the worker's local Codex model."""
+
+    calls: list[list[str]] = []
+
+    def run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        """Record an unexpected subprocess invocation."""
+
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout='', stderr='')
+
+    monkeypatch.setattr(codex_cli.subprocess, 'run', run)
+
+    result = codex_cli.execute_codex_cli(
+        {
+            'input': 'Inspect the project.',
+            'payload': {
+                'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
+                'instruction_snapshot': instruction_snapshot(),
+            },
+        },
+        tmp_path,
+    )
+
+    assert result == {
+        'action': 'run_harness',
+        'completed': False,
+        'error': 'Activity response is missing its requested model.',
+    }
+    assert calls == []

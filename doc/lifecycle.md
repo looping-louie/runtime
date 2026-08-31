@@ -23,6 +23,7 @@ local checkout.
 The API is the control plane and source of truth for:
 
 - Pipeline definitions, Activity definitions, and their immutable run snapshots.
+- Effective model selection frozen into each Codex Activity-run snapshot.
 - Pipeline-run, step, and Activity-run status.
 - Queue ordering, claim leases, continuation tokens, and idempotency records.
 - Model generation, reviewer decisions, and planned file operations.
@@ -44,6 +45,8 @@ actions in that checkout. Its responsibilities are:
 - Supplying review input from the final local diff.
 - Evaluating local Git policy and committing allowed changes.
 - Reporting the outcome of each local checkpoint to the API.
+- Passing the API-frozen Codex model to the local CLI and reporting the
+  requested and actual model observations.
 
 The runtime must never choose a checkout from an API response or update a
 Pipeline or Activity status in local storage.

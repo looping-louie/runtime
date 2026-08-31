@@ -55,8 +55,9 @@ performs these checkpoint actions in the mapped checkout:
 - `run_harness`: runs one frozen `codex_cli` v1 direct-loop turn through the
   local Codex CLI. It injects the frozen Persona into the prompt, temporarily
   materializes every frozen Skill as `.agents/skills/<name>/SKILL.md`, and
-  reports the final response, proposed commit message, diff, changed files,
-  usage, diagnostics, and session reference to the API. Codex is explicitly
+  passes the API-frozen model through `codex exec --model`. It reports the final
+  response, requested and actual model, proposed commit message, diff, changed
+  files, usage, diagnostics, and session reference to the API. Codex is explicitly
   instructed to leave changes uncommitted. The temporary Skill directories are
   removed before the checkout diff is collected.
 - `submit_review_input`: sends the final Git diff and bounded changed-file
@@ -85,12 +86,17 @@ project-to-checkout mapping in its local configuration. Repository context
 collection is read-only and does not stage untracked files or otherwise modify
 the Git index.
 
-For `codex_cli`, the runtime reads local environment settings rather than
-Pipeline configuration: `LOUIE_CODEX_COMMAND` defaults to `codex`,
+For `codex_cli`, the model is selected by the API and supplied as
+`requested_model`; the runtime refuses to use a local model default and passes
+the value to `codex exec --model`. It still reads machine-owned environment
+settings: `LOUIE_CODEX_COMMAND` defaults to `codex`,
 `LOUIE_CODEX_SANDBOX` defaults to `workspace-write`, and
 `LOUIE_CODEX_TIMEOUT_SECONDS` defaults to `1800` seconds. Persona and Skill
 content comes only from the immutable Activity snapshot supplied by the API;
 the runtime does not fetch mutable instruction resources during execution.
+Codex/OpenAI authentication remains local to the CLI and does not use API
+Linked Services. When Codex startup JSONL exposes a model, the runtime records
+it as `actual_model`; otherwise the explicitly requested CLI model is recorded.
 For commit-enabled runs, Codex must return a structured final response with a
 non-empty `commit_message`. The runtime submits that proposal to the API and
 performs Git only if the next checkpoint is `commit_if_allowed`.

@@ -125,16 +125,21 @@ operations. Return the application outcome, diff, and changed files.
 
 ### `run_harness`
 
-Validate the API-frozen `codex_cli` Harness and instruction snapshot. Inject
-the Persona content into the task prompt and materialize each Skill for the
-duration of the Codex process at `.agents/skills/<normalized-name>/SKILL.md`.
+Validate the API-frozen `codex_cli` Harness, requested model, and instruction
+snapshot. Pass the model through `codex exec --model`, inject the Persona
+content into the task prompt, and materialize each Skill for the duration of
+the Codex process at `.agents/skills/<normalized-name>/SKILL.md`.
 Each selected Skill is referenced explicitly in the prompt by its normalized
 `$name`. Temporary Skill directories are removed before diff collection and
 are also removed when the process fails. A checkout-owned directory with the
 same Skill name is never overwritten. The prompt forbids Codex from creating a
 Git commit and requires a machine-readable final summary plus a commit proposal
 for commit-enabled runs. That proposal is submitted through `run_harness`; Git
-is executed only after the API returns `commit_if_allowed`.
+is executed only after the API returns `commit_if_allowed`. Successful results
+also report `requested_model` and `actual_model`. A model observed in Codex
+startup JSONL is used as the actual value; otherwise the explicit CLI model is
+reported. Codex authentication remains local and API Linked Services are not
+used by this Harness.
 
 ### `submit_review_input`
 

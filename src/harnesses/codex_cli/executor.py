@@ -19,6 +19,7 @@ def execute_codex_cli(response: Mapping[str, object], checkout_path: Path) -> di
     try:
         payload = _require_payload(response)
         _require_codex_harness(payload)
+        requested_model = _require_requested_model(payload)
         command = os.environ.get('LOUIE_CODEX_COMMAND', 'codex').strip()
         if not command:
             raise ValueError('LOUIE_CODEX_COMMAND must not be empty.')
@@ -26,7 +27,16 @@ def execute_codex_cli(response: Mapping[str, object], checkout_path: Path) -> di
         commit_forbidden = payload.get('commit_mode') == 'forbid'
         with materialize_instruction_snapshot(checkout_path, snapshot) as instructions:
             result = subprocess.run(
-                [command, 'exec', '--json', '--sandbox', _sandbox(), '-'],
+                [
+                    command,
+                    'exec',
+                    '--json',
+                    '--model',
+                    requested_model,
+                    '--sandbox',
+                    _sandbox(),
+                    '-',
+                ],
                 input=_prompt(
                     response,
                     payload,
@@ -48,7 +58,9 @@ def execute_codex_cli(response: Mapping[str, object], checkout_path: Path) -> di
             'error': result.stderr.strip() or f'Codex exited with status {result.returncode}.',
         }
     try:
-        session_reference, completion, usage, diagnostics = _parse_events(result.stdout)
+        session_reference, completion, usage, diagnostics, observed_model = (
+            _parse_events(result.stdout)
+        )
         final_response, commit_message = _parse_completion(
             completion,
             require_commit_message=not commit_forbidden,
@@ -59,6 +71,8 @@ def execute_codex_cli(response: Mapping[str, object], checkout_path: Path) -> di
         'action': 'run_harness',
         'completed': True,
         'final_response': final_response,
+        'requested_model': requested_model,
+        'actual_model': observed_model or requested_model,
         'final_diff': get_git_diff(checkout_path),
         'changed_files': get_changed_files(checkout_path),
         'usage': usage,
@@ -98,6 +112,15 @@ def _require_instruction_snapshot(
     if not isinstance(snapshot, Mapping):
         raise ValueError('Activity response is missing its instruction snapshot.')
     return snapshot
+
+
+def _require_requested_model(payload: Mapping[str, object]) -> str:
+    """Return the immutable model selected by the API for this run."""
+
+    requested_model = payload.get('requested_model')
+    if not isinstance(requested_model, str) or not requested_model.strip():
+        raise ValueError('Activity response is missing its requested model.')
+    return requested_model.strip()
 
 
 def _prompt(
@@ -158,13 +181,16 @@ def _timeout_seconds() -> float:
     return timeout
 
 
-def _parse_events(stdout: str) -> tuple[str | None, str, dict[str, int], list[str]]:
-    """Extract Codex's final response and safe diagnostics from JSONL output."""
+def _parse_events(
+    stdout: str,
+) -> tuple[str | None, str, dict[str, int], list[str], str | None]:
+    """Extract Codex's response, observations, and diagnostics from JSONL."""
 
     session_reference: str | None = None
     final_response: str | None = None
     usage: dict[str, int] = {}
     diagnostics: list[str] = []
+    observed_model: str | None = None
     for line in stdout.splitlines():
         if not line.strip():
             continue
@@ -177,6 +203,10 @@ def _parse_events(stdout: str) -> tuple[str | None, str, dict[str, int], list[st
         if event.get('type') == 'thread.started':
             thread_id = event.get('thread_id')
             session_reference = thread_id if isinstance(thread_id, str) and thread_id else None
+        if event.get('type') in ('thread.started', 'turn.started'):
+            event_model = event.get('model')
+            if isinstance(event_model, str) and event_model.strip():
+                observed_model = event_model.strip()
         item = event.get('item')
         if event.get('type') == 'item.completed' and isinstance(item, dict):
             text = item.get('text')
@@ -192,7 +222,7 @@ def _parse_events(stdout: str) -> tuple[str | None, str, dict[str, int], list[st
             diagnostics.append(str(event.get('message') or event.get('type')))
     if final_response is None:
         raise ValueError('Codex did not complete the turn.')
-    return session_reference, final_response, usage, diagnostics
+    return session_reference, final_response, usage, diagnostics, observed_model
 
 
 def _parse_completion(
