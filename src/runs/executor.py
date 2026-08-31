@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 from typing import Protocol
 from uuid import uuid4
 
 from harnesses.codex_cli import execute_codex_cli
 from harnesses.louie import execute_louie_action, prepare_louie_execution
+from runs.lease_keepalive import LeaseKeepalive
 from runs.models import ClaimedPipelineRun
 
 
 ACTIVITY_RUN_STATUSES = frozenset({'in_progress', 'completed', 'failed', 'stopped'})
 PIPELINE_RUN_STATUSES = frozenset({'queued', 'claimed', 'in_progress', 'failed', 'completed'})
+LEASE_KEEPALIVE_INTERVAL_SECONDS = 30.0
 
 
 class ActivityCheckpointClient(Protocol):
@@ -76,12 +78,14 @@ class ActivityExecutor:
         activity_client: ActivityCheckpointClient,
         pipeline_client: PipelineContinuationClient,
         harness_runner: Callable[[dict[str, object], Path], dict[str, object]] = execute_codex_cli,
+        lease_keepalive_interval_seconds: float = LEASE_KEEPALIVE_INTERVAL_SECONDS,
     ) -> None:
         """Store the API clients used to complete Activity and Pipeline runs."""
 
         self._activity_client = activity_client
         self._pipeline_client = pipeline_client
         self._harness_runner = harness_runner
+        self._lease_keepalive_interval_seconds = lease_keepalive_interval_seconds
 
     def execute_claim(self, claim: ClaimedPipelineRun, checkout_path: Path) -> None:
         """Execute the claimed child's supported checkpoint actions to completion."""
@@ -136,6 +140,7 @@ class ActivityExecutor:
                 continuation_token=_require_text(response, 'continuation_token'),
                 idempotency_key=uuid4().hex,
                 result=self._action_result(
+                    claim=claim,
                     response=response,
                     checkout_path=checkout_path,
                     policy=policy,
@@ -156,6 +161,7 @@ class ActivityExecutor:
     def _action_result(
         self,
         *,
+        claim: ClaimedPipelineRun,
         response: dict[str, object],
         checkout_path: Path,
         policy: dict[str, object],
@@ -164,7 +170,11 @@ class ActivityExecutor:
 
         action = _require_text(response, 'next_action')
         if action == 'run_harness':
-            return self._harness_runner(response, checkout_path)
+            with LeaseKeepalive(
+                renew=lambda: self._renew_lease(claim),
+                interval_seconds=self._lease_keepalive_interval_seconds,
+            ):
+                return self._harness_runner(response, checkout_path)
         return execute_louie_action(
             response=response,
             checkout_path=checkout_path,

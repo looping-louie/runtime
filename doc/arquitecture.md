@@ -170,6 +170,8 @@ protection, commit metadata, or repository state blocks the action.
 A successful claim includes a secret lease token. The executor renews that
 lease before every Activity checkpoint and before Pipeline continuation. It
 also submits the Pipeline run ID and lease token with every Activity checkpoint.
+During a blocking `codex_cli` turn, a background keepalive renews the lease
+every 30 seconds. If renewal fails, the completed local turn is not submitted.
 
 The API validates lease ownership before generation and again atomically when
 it persists an Activity or Pipeline transition. A runtime whose lease has
