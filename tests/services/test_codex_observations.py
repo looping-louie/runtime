@@ -15,22 +15,7 @@ from harnesses.codex_cli.observations import (
     parse_codex_events,
 )
 from tests.contract_fixtures import load_harness_observation
-
-
-def instruction_snapshot() -> dict[str, object]:
-    """Build one immutable Persona and Skill snapshot for a failed turn."""
-
-    return {
-        'snapshot_version': 1,
-        'persona': {'content': 'Implement carefully.'},
-        'skills': [{
-            'id': 'skill-api',
-            'name': 'API Compatibility',
-            'description': 'Preserve contracts.',
-            'content': 'Keep the API compatible.',
-            'version': 3,
-        }],
-    }
+from tests.harness_fixtures import codex_activity
 
 
 def test_session_context_supplies_actual_model_and_reasoning_effort(
@@ -94,14 +79,7 @@ def test_failed_process_keeps_partial_session_tokens_and_checkout_state(
 
     monkeypatch.setattr(codex_cli.subprocess, 'run', run)
 
-    result = codex_cli.execute_codex_cli({
-        'input': 'Implement.',
-        'payload': {
-            'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
-            'requested_model': 'gpt-5-codex',
-            'instruction_snapshot': instruction_snapshot(),
-        },
-    }, tmp_path)
+    result = codex_cli.execute_codex_cli(codex_activity('Implement.'), tmp_path)
 
     assert result == {
         'action': 'run_harness',

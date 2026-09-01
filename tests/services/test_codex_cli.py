@@ -11,6 +11,7 @@ import pytest
 
 from harnesses.codex_cli import executor as codex_cli
 from tests.contract_fixtures import load_harness_observation
+from tests.harness_fixtures import codex_activity
 
 
 @pytest.fixture(autouse=True)
@@ -27,28 +28,6 @@ def stable_observation_clocks(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(codex_cli, 'get_head_sha', lambda _path: 'source-sha')
     monkeypatch.setattr(codex_cli, 'get_git_diff', lambda _path: '')
     monkeypatch.setattr(codex_cli, 'get_changed_files', lambda _path: [])
-
-
-def instruction_snapshot() -> dict[str, object]:
-    """Build one immutable Persona and Skill snapshot from the API."""
-
-    return {
-        'snapshot_version': 1,
-        'persona': {
-            'id': 'persona-1',
-            'name': 'Implementer',
-            'content': 'Make the smallest coherent implementation.',
-        },
-        'skills': [
-            {
-                'id': 'skill-api',
-                'name': 'API Compatibility',
-                'description': 'Preserve existing API contracts.',
-                'content': 'Keep public API contracts backwards compatible.',
-                'version': 3,
-            },
-        ],
-    }
 
 
 def completed_events(
@@ -116,21 +95,13 @@ def test_execute_codex_cli_reports_completed_turn(
     monkeypatch.setattr(codex_cli, 'get_git_diff', lambda _path: 'diff --git a/a b/a')
     monkeypatch.setattr(codex_cli, 'get_changed_files', lambda _path: ['a.txt'])
 
-    result = codex_cli.execute_codex_cli(
-        {
-            'input': 'Create a file.',
-            'payload': {
-                'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
-                'commit_mode': 'allow',
-                'requested_model': 'gpt-5-codex',
-                'instruction_snapshot': instruction_snapshot(),
-                'repo_context': 'Repository context.',
-                'constitution': '',
-                'project_profile': {},
-            },
-        },
-        tmp_path,
-    )
+    result = codex_cli.execute_codex_cli(codex_activity(
+        'Create a file.',
+        commit_mode='allow',
+        repo_context='Repository context.',
+        constitution='',
+        project_profile={},
+    ), tmp_path)
 
     assert calls[0][0] == [
         'codex', 'exec', '--json', '--model', 'gpt-5-codex',
@@ -168,17 +139,7 @@ def test_execute_codex_cli_removes_materialized_skills_after_failure(
 
     monkeypatch.setattr(codex_cli.subprocess, 'run', run)
 
-    result = codex_cli.execute_codex_cli(
-        {
-            'input': 'Create a file.',
-            'payload': {
-                'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
-                'requested_model': 'gpt-5-codex',
-                'instruction_snapshot': instruction_snapshot(),
-            },
-        },
-        tmp_path,
-    )
+    result = codex_cli.execute_codex_cli(codex_activity('Create a file.'), tmp_path)
 
     assert result['completed'] is False
     assert result['error'] == 'Codex failed.'
@@ -213,17 +174,7 @@ def test_execute_codex_cli_preserves_an_existing_project_skill(
 
     monkeypatch.setattr(codex_cli.subprocess, 'run', run)
 
-    result = codex_cli.execute_codex_cli(
-        {
-            'input': 'Create a file.',
-            'payload': {
-                'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
-                'requested_model': 'gpt-5-codex',
-                'instruction_snapshot': instruction_snapshot(),
-            },
-        },
-        tmp_path,
-    )
+    result = codex_cli.execute_codex_cli(codex_activity('Create a file.'), tmp_path)
 
     assert result['completed'] is False
     assert 'already exists' in str(result['error'])
@@ -250,17 +201,7 @@ def test_execute_codex_cli_rejects_a_symlinked_agents_directory(
 
     monkeypatch.setattr(codex_cli.subprocess, 'run', run)
 
-    result = codex_cli.execute_codex_cli(
-        {
-            'input': 'Create a file.',
-            'payload': {
-                'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
-                'requested_model': 'gpt-5-codex',
-                'instruction_snapshot': instruction_snapshot(),
-            },
-        },
-        tmp_path,
-    )
+    result = codex_cli.execute_codex_cli(codex_activity('Create a file.'), tmp_path)
 
     assert result['completed'] is False
     assert 'not a directory' in str(result['error'])
@@ -286,18 +227,9 @@ def test_execute_codex_cli_rejects_missing_commit_message(
 
     monkeypatch.setattr(codex_cli.subprocess, 'run', run)
 
-    result = codex_cli.execute_codex_cli(
-        {
-            'input': 'Create a file.',
-            'payload': {
-                'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
-                'commit_mode': 'allow',
-                'requested_model': 'gpt-5-codex',
-                'instruction_snapshot': instruction_snapshot(),
-            },
-        },
-        tmp_path,
-    )
+    result = codex_cli.execute_codex_cli(codex_activity(
+        'Create a file.', commit_mode='allow',
+    ), tmp_path)
 
     assert result['completed'] is False
     assert 'expected commit_message, final_response' in str(result['error'])
@@ -326,18 +258,9 @@ def test_execute_codex_cli_accepts_no_message_when_commit_is_forbidden(
     monkeypatch.setattr(codex_cli, 'get_git_diff', lambda _path: '')
     monkeypatch.setattr(codex_cli, 'get_changed_files', lambda _path: [])
 
-    result = codex_cli.execute_codex_cli(
-        {
-            'input': 'Inspect the project.',
-            'payload': {
-                'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
-                'commit_mode': 'forbid',
-                'requested_model': 'gpt-5-codex',
-                'instruction_snapshot': instruction_snapshot(),
-            },
-        },
-        tmp_path,
-    )
+    result = codex_cli.execute_codex_cli(codex_activity(
+        'Inspect the project.', commit_mode='forbid',
+    ), tmp_path)
 
     assert result['completed'] is True
     assert result['final_response'] == 'Done without commit.'
@@ -364,16 +287,9 @@ def test_execute_codex_cli_rejects_a_missing_requested_model(
 
     monkeypatch.setattr(codex_cli.subprocess, 'run', run)
 
-    result = codex_cli.execute_codex_cli(
-        {
-            'input': 'Inspect the project.',
-            'payload': {
-                'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
-                'instruction_snapshot': instruction_snapshot(),
-            },
-        },
-        tmp_path,
-    )
+    result = codex_cli.execute_codex_cli(codex_activity(
+        'Inspect the project.', requested_model=None,
+    ), tmp_path)
 
     assert result['action'] == 'run_harness'
     assert result['completed'] is False
