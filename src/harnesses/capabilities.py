@@ -44,9 +44,7 @@ def detect_harness_capabilities(
 
     capabilities = ['louie']
     command = os.environ.get('LOUIE_CODEX_COMMAND', 'codex').strip()
-    if command and _command_succeeds([command, '--version'], run=run) and _command_succeeds(
-        [command, 'login', 'status'], run=run,
-    ):
+    if command and _command_succeeds([command, 'login', 'status'], run=run):
         capabilities.append('codex_cli')
     return tuple(capabilities)
 

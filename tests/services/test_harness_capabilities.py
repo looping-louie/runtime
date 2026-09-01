@@ -11,7 +11,7 @@ from harnesses.capabilities import (
 
 
 def test_detect_harnesses_includes_authenticated_codex() -> None:
-    """Codex is advertised only after executable and login checks succeed."""
+    """Codex is advertised only after its local login check succeeds."""
 
     calls: list[list[str]] = []
 
@@ -24,21 +24,16 @@ def test_detect_harnesses_includes_authenticated_codex() -> None:
     capabilities = detect_harness_capabilities(run=run)
 
     assert capabilities == ('louie', 'codex_cli')
-    assert calls == [['codex', '--version'], ['codex', 'login', 'status']]
+    assert calls == [['codex', 'login', 'status']]
 
 
 def test_detect_harnesses_omits_unauthenticated_codex() -> None:
     """A failed login check prevents the worker from claiming Codex runs."""
 
     def run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
-        """Make only the executable check succeed."""
+        """Reject the local login check."""
 
-        return subprocess.CompletedProcess(
-            command,
-            0 if command[-1] == '--version' else 1,
-            '',
-            '',
-        )
+        return subprocess.CompletedProcess(command, 1, '', '')
 
     assert detect_harness_capabilities(run=run) == ('louie',)
 

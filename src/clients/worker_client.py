@@ -35,10 +35,7 @@ class WorkerHeartbeatClient:
             method='POST',
             project_id=project_id,
             path='/workers',
-            payload={'harnesses': [
-                {'kind': harness, 'version': 'v1', 'config': {}}
-                for harness in harnesses
-            ]},
+            payload=_capability_payload(harnesses),
         )
         worker_id = response.get('id')
         if not isinstance(worker_id, str) or not worker_id:
@@ -58,10 +55,7 @@ class WorkerHeartbeatClient:
             method='POST',
             project_id=project_id,
             path=f'/workers/{quote(worker_id, safe="")}/heartbeat',
-            payload={'harnesses': [
-                {'kind': harness, 'version': 'v1', 'config': {}}
-                for harness in harnesses
-            ]},
+            payload=_capability_payload(harnesses),
         )
 
     def _request(
@@ -95,3 +89,12 @@ class WorkerHeartbeatClient:
         if not isinstance(value, dict):
             raise RuntimeError('Worker lifecycle response must be a JSON object.')
         return value
+
+
+def _capability_payload(harnesses: tuple[str, ...]) -> dict[str, object]:
+    """Serialize detected Harness identities for worker lifecycle requests."""
+
+    return {'harnesses': [
+        {'kind': harness, 'version': 'v1', 'config': {}}
+        for harness in harnesses
+    ]}
