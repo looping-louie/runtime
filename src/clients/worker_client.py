@@ -50,6 +50,7 @@ class WorkerHeartbeatClient:
         *,
         project_id: str,
         worker_id: str,
+        harnesses: tuple[str, ...],
     ) -> None:
         """Record a liveness heartbeat for one registered runtime worker."""
 
@@ -57,6 +58,10 @@ class WorkerHeartbeatClient:
             method='POST',
             project_id=project_id,
             path=f'/workers/{quote(worker_id, safe="")}/heartbeat',
+            payload={'harnesses': [
+                {'kind': harness, 'version': 'v1', 'config': {}}
+                for harness in harnesses
+            ]},
         )
 
     def _request(

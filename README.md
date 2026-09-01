@@ -41,9 +41,11 @@ looping-louie-runtime --config runtime.json
 
 During initial provisioning, the runtime always advertises `louie`. It also
 advertises `codex_cli` only when the configured `LOUIE_CODEX_COMMAND` passes
-both `--version` and `login status`. If Codex is installed after a Louie-only
-worker was created, remove that project's `worker_id` and start the runtime
-once to create and persist a new worker identity.
+both `--version` and `login status`. The same detection is refreshed while the
+worker runs and the current Harness set is sent with each project heartbeat.
+Installing Codex, logging in, or logging out therefore updates claim admission
+without replacing the persisted `worker_id`; detection is cached for 30
+seconds.
 
 The worker polls every configured project, claims at most one available run
 per project in each cycle, and waits for `poll_interval_seconds` before the

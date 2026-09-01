@@ -6,7 +6,8 @@ The API provisions a `worker_id` for each configured project. The runtime
 stores that identity in its project mapping and sends a heartbeat before each
 project poll.
 The API permits a PipelineRun claim only when that worker has sent a heartbeat
-within the active heartbeat window.
+within the active heartbeat window and currently advertises the run's frozen
+Harness.
 
 Provisioning answers which durable worker identity may act in a project. A
 heartbeat answers whether that identity is currently available. A
@@ -18,10 +19,12 @@ A worker is a specific running instance of `looping-louie-runtime`. It is not
 a new kind of Pipeline, Activity, or ActivityRun.
 
 That identity is `ProjectCheckout.worker_id`. The API persists a durable
-project-scoped identity and recent heartbeat for it, then stores the ID on
-claimed `pipeline_runs`. Capabilities remain intentionally deferred: this slice
-does not claim that a registered worker can execute every possible future
-Activity type.
+project-scoped identity, recent heartbeat, and currently observed Harnesses for
+it, then stores the ID on claimed `pipeline_runs`. Every heartbeat replaces the
+capability set. The runtime always advertises `louie` and advertises
+`codex_cli` only while the configured executable and local login check succeed.
+It does not advertise models: model policy belongs to the API, while acceptance
+by the authenticated Codex account is ultimately an execution-time CLI result.
 
 ```mermaid
 sequenceDiagram
@@ -30,6 +33,7 @@ sequenceDiagram
     participant Run as PipelineRun
     participant Child as ActivityRun
 
+    Runtime->>API: Heartbeat with current Harnesses
     Runtime->>API: List claimable PipelineRuns
     Runtime->>API: Claim run with worker_id and ETag
     API->>Run: Persist worker_id, lease_token, and expiry
@@ -58,7 +62,7 @@ semantics.
 | Answers | Is this runtime instance currently available? | May this instance mutate this specific run? |
 | Scope | Worker, likely per configured project | One PipelineRun |
 | Expiry consequence | Stop admitting new claims to that worker | Another worker may reclaim the stalled run |
-| Renewal | Periodic background heartbeat | Before execution-changing API calls |
+| Renewal | Before each project poll, with current Harnesses | Before execution-changing API calls |
 
 ## Pull-Based Claiming
 
@@ -83,24 +87,24 @@ execution, while the API remains the scheduler and source of truth.
 
 ## Capabilities
 
-Capabilities matter only when different workers can actually execute different
-runtime work. A conservative capability declaration could be:
+Capabilities describe current local Harness health, not every activity type or
+model that might be accepted. The heartbeat declaration is:
 
 ```json
 {
-  "worker_id": "runtime-local-01",
-  "projects": ["project-acme"],
-  "activity_types": [
-    "direct_loop",
-    "refinement_loop",
-    "roundtable_loop"
+  "harnesses": [
+    {"kind": "louie", "version": "v1", "config": {}},
+    {"kind": "codex_cli", "version": "v1", "config": {}}
   ]
 }
 ```
 
 The API compares that declaration with the frozen selected Activity snapshot.
 It must never treat `approval` or `quiz` as worker capabilities: they have an
-`executor` of `human` and are not runtime work.
+`executor` of `human` and are not runtime work. A valid PipelineRun remains
+queued while no active worker advertises its Harness. After, for example,
+`codex login` succeeds, a later heartbeat adds `codex_cli` and normal polling
+can claim the existing run without user intervention.
 
 ## Human ActivityRuns
 
@@ -124,20 +128,10 @@ flowchart LR
     C --> P
 ```
 
-## Recommended First Step
+## Current Narrow Implementation
 
-All current runtime Activity types use the same runtime executable and
-checkpoint protocol. The configured project mapping already constrains each
-runtime to repositories it may execute. Provisioning and heartbeat therefore
-provide useful liveness and observability, while capability filtering should
-wait for a concrete routing requirement, such as different model-provider
-access, platform tooling, network or credential boundaries, execution engines,
-or project-specific worker pools.
-
-The narrow first implementation is:
-
-1. Provision one worker identity per project with a heartbeat timestamp.
-2. Require an active heartbeat for a runtime claim.
-3. Keep Pipeline-run leases unchanged.
-4. Do not add capabilities until a real runtime difference requires them.
-5. Schedule human ActivityRuns without a runtime claim.
+The worker provisions one identity per project, reports liveness and its two
+supported Harness kinds, and leaves Pipeline-run leases unchanged. The
+capability detector is shared across projects and cached for 30 seconds so a
+poll cycle does not repeatedly spawn Codex probes. Human ActivityRuns remain
+outside worker capabilities.

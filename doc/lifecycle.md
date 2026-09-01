@@ -41,6 +41,7 @@ actions in that checkout. Its responsibilities are:
 - Polling configured projects and claiming at most one run per project.
 - Propagating the configured User identity in all API communication.
 - Provisioning each missing worker once with locally detected Harnesses.
+- Re-detecting local Harness health and reporting the current set on heartbeat.
 - Renewing the active Pipeline lease before every state-changing checkpoint.
 - Collecting bounded repository context.
 - Applying validated planned file operations.
@@ -63,8 +64,14 @@ Codex executable and local login. It always supports `louie`; it adds
 `codex_cli` only when both checks succeed. The project is then registered
 through `POST /workers`, and the returned ID is persisted immediately in the
 runtime JSON. Later starts reuse that ID and follow the existing heartbeat and
-polling flow. All API requests carry the configured `X-User-ID` and the
-project-specific `X-Project-ID`.
+polling flow. During polling, a shared detector refreshes at most every 30
+seconds and each project heartbeat replaces the API's observed Harness set.
+Consequently a queued Codex run becomes claimable after a successful local
+login without reprovisioning the worker or recreating the run. The runtime does
+not enumerate Codex models; the API freezes the requested model and the CLI is
+the execution-time authority for whether that authenticated account accepts
+it. All API requests carry the configured `X-User-ID` and the project-specific
+`X-Project-ID`.
 
 ## Normal Execution
 

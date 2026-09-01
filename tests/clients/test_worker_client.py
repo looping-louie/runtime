@@ -24,7 +24,11 @@ def test_worker_client_heartbeats_provisioned_workspace_worker() -> None:
         client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
 
-    client.heartbeat(project_id='project-1', worker_id='worker-1')
+    client.heartbeat(
+        project_id='project-1',
+        worker_id='worker-1',
+        harnesses=('louie',),
+    )
 
     assert [(request.method, request.url.path) for request in requests] == [
         ('POST', '/api/v1/workers/worker-1/heartbeat'),
@@ -34,6 +38,9 @@ def test_worker_client_heartbeats_provisioned_workspace_worker() -> None:
         for request in requests
     )
     assert all(request.headers['X-User-ID'] == 'user-1' for request in requests)
+    assert requests[0].read() == (
+        b'{"harnesses":[{"kind":"louie","version":"v1","config":{}}]}'
+    )
 
 
 def test_worker_client_provisions_detected_harnesses() -> None:

@@ -39,12 +39,18 @@ class FakeHeartbeatClient:
     def __init__(self) -> None:
         """Initialize an empty heartbeat request log."""
 
-        self.heartbeats: list[tuple[str, str]] = []
+        self.heartbeats: list[tuple[str, str, tuple[str, ...]]] = []
 
-    def heartbeat(self, *, project_id: str, worker_id: str) -> None:
+    def heartbeat(
+        self,
+        *,
+        project_id: str,
+        worker_id: str,
+        harnesses: tuple[str, ...],
+    ) -> None:
         """Record one project heartbeat request."""
 
-        self.heartbeats.append((project_id, worker_id))
+        self.heartbeats.append((project_id, worker_id, harnesses))
 
 
 def test_run_once_executes_claim_in_its_mapped_checkout(tmp_path: Path) -> None:
@@ -103,14 +109,15 @@ def test_worker_heartbeats_each_provisioned_workspace_worker(
         ),
         claim_client=FakeClaimClient({'project-1': None, 'project-2': None}),
         heartbeat_client=heartbeat_client,
+        harness_capabilities=lambda: ('louie', 'codex_cli'),
         execute_claim=lambda _claim, _checkout: None,
     )
 
     worker.run_once()
 
     assert heartbeat_client.heartbeats == [
-        ('project-1', 'worker-1'),
-        ('project-2', 'worker-2'),
+        ('project-1', 'worker-1', ('louie', 'codex_cli')),
+        ('project-2', 'worker-2', ('louie', 'codex_cli')),
     ]
 
 

@@ -50,7 +50,9 @@ delay. Unexpected errors stop the process.
 When a project lacks a worker ID, the runtime detects whether the configured
 Codex executable is installed and authenticated, registers the worker once
 with the detected Harness set, and persists the returned API ID atomically in
-the runtime JSON.
+the runtime JSON. The same detector refreshes at most every 30 seconds and each
+heartbeat replaces the API's observed Harness set. The worker advertises local
+Harness health only; it does not attempt to enumerate models accepted by Codex.
 
 ## Source Structure
 
@@ -101,9 +103,10 @@ tests/
 ### Composition
 
 `main.py` is the composition root. It loads and validates `RuntimeConfig`,
-detects local Harnesses, provisions missing workers, creates the HTTP clients,
-passes them to `ActivityExecutor`, and constructs `RuntimeWorker` with the
-executor callback. It then invokes `run_forever`.
+constructs the cached local-Harness detector, provisions missing workers,
+creates the HTTP clients, passes them to `ActivityExecutor`, and constructs
+`RuntimeWorker` with the executor callback and capability supplier. It then
+invokes `run_forever`.
 
 Dependency flow is:
 

@@ -8,7 +8,7 @@ from clients.activity_client import ActivityRunClient
 from clients.pipeline_client import PipelineRunClaimClient
 from clients.worker_client import WorkerHeartbeatClient
 from configuration.runtime import load_config
-from harnesses.capabilities import detect_harness_capabilities
+from harnesses.capabilities import HarnessCapabilityDetector
 from polling.loop import run_forever
 from polling.worker import RuntimeWorker
 from provisioning import provision_missing_workers
@@ -34,12 +34,13 @@ def main() -> None:
         api_base_url=config.api_base_url,
         user_id=config.user_id,
     )
+    capability_detector = HarnessCapabilityDetector()
     if any(project.worker_id is None for project in config.projects):
         config = provision_missing_workers(
             config_path=arguments.config,
             config=config,
             client=worker_client,
-            harnesses=detect_harness_capabilities(),
+            harnesses=capability_detector.current(),
         )
     activity_client = ActivityRunClient(
         api_base_url=config.api_base_url,
@@ -53,6 +54,7 @@ def main() -> None:
         config=config,
         claim_client=pipeline_client,
         heartbeat_client=worker_client,
+        harness_capabilities=capability_detector.current,
         execute_claim=ActivityExecutor(
             activity_client=activity_client,
             pipeline_client=pipeline_client,

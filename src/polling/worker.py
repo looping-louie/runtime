@@ -29,7 +29,13 @@ class ClaimClient(Protocol):
 class WorkerHeartbeatClient(Protocol):
     """Refresh liveness signals for provisioned runtime identities."""
 
-    def heartbeat(self, *, project_id: str, worker_id: str) -> None:
+    def heartbeat(
+        self,
+        *,
+        project_id: str,
+        worker_id: str,
+        harnesses: tuple[str, ...],
+    ) -> None:
         """Record one worker liveness heartbeat."""
 
 
@@ -42,6 +48,7 @@ class RuntimeWorker:
         config: RuntimeConfig,
         claim_client: ClaimClient,
         heartbeat_client: WorkerHeartbeatClient | None = None,
+        harness_capabilities: Callable[[], tuple[str, ...]] | None = None,
         execute_claim: Callable[[ClaimedPipelineRun, Path], None],
     ) -> None:
         """Store the project mapping, API client, and execution adapter."""
@@ -49,12 +56,14 @@ class RuntimeWorker:
         self._config = config
         self._claim_client = claim_client
         self._heartbeat_client = heartbeat_client
+        self._harness_capabilities = harness_capabilities or (lambda: ('louie',))
         self._execute_claim = execute_claim
 
     def run_once(self) -> int:
         """Claim and delegate one available pipeline run for each project."""
 
         claimed_count = 0
+        harnesses = self._harness_capabilities()
         for project in self._config.projects:
             try:
                 worker_id = project.require_worker_id()
@@ -62,6 +71,7 @@ class RuntimeWorker:
                     self._heartbeat_client.heartbeat(
                         project_id=project.project_id,
                         worker_id=worker_id,
+                        harnesses=harnesses,
                     )
                 claim = self._claim_client.claim_next(
                     project_id=project.project_id,

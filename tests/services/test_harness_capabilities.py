@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import subprocess
 
-from harnesses.capabilities import detect_harness_capabilities
+from harnesses.capabilities import (
+    HarnessCapabilityDetector,
+    detect_harness_capabilities,
+)
 
 
 def test_detect_harnesses_includes_authenticated_codex() -> None:
@@ -49,3 +52,21 @@ def test_detect_harnesses_omits_missing_codex() -> None:
         raise FileNotFoundError(command[0])
 
     assert detect_harness_capabilities(run=run) == ('louie',)
+
+
+def test_capability_detector_refreshes_authentication_after_interval() -> None:
+    """A later heartbeat can advertise Codex after local login succeeds."""
+
+    now = [0.0]
+    observed = iter((('louie',), ('louie', 'codex_cli')))
+    detector = HarnessCapabilityDetector(
+        refresh_interval_seconds=30,
+        clock=lambda: now[0],
+        detect=lambda: next(observed),
+    )
+
+    assert detector.current() == ('louie',)
+    now[0] = 29
+    assert detector.current() == ('louie',)
+    now[0] = 30
+    assert detector.current() == ('louie', 'codex_cli')
