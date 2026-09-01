@@ -10,7 +10,7 @@ from services.checkout.changes import (
     read_changed_file_contents,
 )
 from services.checkout.operations import apply_file_operations
-from services.checkout.policy import commit_policy_error, load_git_policy
+from services.checkout.policy import commit_policy_error
 from services.checkout.repository import (
     commit_all,
     get_current_branch,
@@ -63,12 +63,6 @@ def execute_louie_action(
             policy=policy,
         )
     raise RuntimeError(f'Unsupported Louie Harness action: {action!r}.')
-
-
-def prepare_louie_execution(checkout_path: Path) -> dict[str, object]:
-    """Capture the local policy before Louie changes the checkout."""
-
-    return load_git_policy(checkout_path)
 
 
 def _apply_operations_result(

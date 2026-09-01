@@ -8,9 +8,10 @@ from typing import Protocol
 from uuid import uuid4
 
 from harnesses.executor import execute_harness
-from harnesses.louie import execute_louie_action, prepare_louie_execution
+from harnesses.louie import execute_louie_action
 from runs.lease_keepalive import LeaseKeepalive
 from runs.models import ClaimedPipelineRun
+from services.checkout.policy import load_git_policy
 
 
 ACTIVITY_RUN_STATUSES = frozenset({'in_progress', 'completed', 'failed', 'stopped'})
@@ -92,7 +93,7 @@ class ActivityExecutor:
 
         pipeline_run = claim.payload
         _require_pipeline_response(pipeline_run)
-        policy = prepare_louie_execution(checkout_path)
+        policy = load_git_policy(checkout_path)
         while (child := pipeline_run.get('current_activity_run')) is not None:
             if not isinstance(child, dict):
                 raise RuntimeError('Pipeline run has an invalid current_activity_run.')
