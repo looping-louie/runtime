@@ -31,7 +31,7 @@ def stable_observation_clocks(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def completed_events(
-    completion: dict[str, str],
+    completion: dict[str, object],
     *,
     actual_model: str | None = None,
 ) -> str:
@@ -298,3 +298,54 @@ def test_execute_codex_cli_rejects_a_missing_requested_model(
     assert result['completed_at'] == '2026-08-31T10:00:00.250000+00:00'
     assert result['duration_ms'] == 250
     assert calls == []
+
+
+@pytest.mark.parametrize(
+    ('phase', 'completion', 'expected_output'),
+    [
+        ('proposal', {'proposal': 'Use the existing service.'}, {
+            'proposal': 'Use the existing service.',
+        }),
+        ('review', {'approved': False, 'feedback': 'Add a boundary test.'}, {
+            'approved': False, 'feedback': 'Add a boundary test.',
+        }),
+    ],
+)
+def test_execute_codex_cli_supports_read_only_loop_turns(
+    monkeypatch: object,
+    tmp_path: Path,
+    phase: str,
+    completion: dict[str, object],
+    expected_output: dict[str, object],
+) -> None:
+    """Proposal and review turns use read-only Codex with structured output."""
+
+    calls: list[tuple[list[str], str]] = []
+
+    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        """Capture the command and return the requested semantic result."""
+
+        calls.append((command, str(kwargs['input'])))
+        return subprocess.CompletedProcess(
+            command, 0, stdout=completed_events(completion), stderr='',
+        )
+
+    monkeypatch.setattr(codex_cli.subprocess, 'run', run)
+    response = codex_activity('Evaluate the task.', commit_mode='allow')
+    response['payload']['turn'] = {
+        'id': f'1:{phase}:agent-1',
+        'phase': phase,
+        'iteration': 1,
+        'agent_id': 'agent-1',
+        'role': 'reviewer' if phase == 'review' else 'generator',
+        'workspace_access': 'read_only',
+    }
+
+    result = codex_cli.execute_codex_cli(response, tmp_path)
+
+    assert calls[0][0][6] == 'read-only'
+    assert 'commit_message' not in calls[0][1]
+    assert result['completed'] is True
+    assert result['turn_id'] == f'1:{phase}:agent-1'
+    assert result['phase'] == phase
+    assert result['output'] == expected_output

@@ -18,9 +18,9 @@ def test_execute_harness_routes_codex_v1(
             'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
         },
     }
-    monkeypatch.setattr(
-        executor,
-        'execute_codex_cli',
+    monkeypatch.setitem(
+        executor.HARNESS_ADAPTERS,
+        ('codex_cli', 'v1'),
         lambda received, checkout: {
             'received': received,
             'checkout': str(checkout),

@@ -62,11 +62,14 @@ performs these checkpoint actions in the mapped checkout:
 	the checkout constitution to the API.
 - `apply_operations`: validates and atomically applies API-provided file
 	operations without permitting checkout escape or symbolic-link traversal.
-- `run_harness`: runs one frozen `codex_cli` v1 direct-loop turn through the
-  local Codex CLI. It injects the frozen Persona into the prompt, temporarily
+- `run_harness`: runs one API-selected `codex_cli` v1 agent turn through the
+  local Codex CLI. Direct writers and roundtable aggregators may modify the
+  checkout; roundtable proposals and refinement reviews use Codex's read-only
+  sandbox. It injects the turn's frozen Persona into the prompt, temporarily
   materializes every frozen Skill as `.agents/skills/<name>/SKILL.md`, and
   passes the API-frozen model through `codex exec --model`. It reports the final
-  response, timestamps and duration, requested and actual model, reasoning
+  phase, agent, iteration, structured output, response, timestamps and duration,
+  requested and actual model, reasoning
   effort, proposed commit message, process exit, versioned Skills, source and
   final Git commits, diff, changed files, usage, diagnostics, and session
   reference to the API. Codex is explicitly

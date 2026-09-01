@@ -23,10 +23,12 @@ local checkout.
 The API is the control plane and source of truth for:
 
 - Pipeline definitions, Activity definitions, and their immutable run snapshots.
-- Effective model selection frozen into each Codex Activity-run snapshot.
+- Effective model and instruction selection frozen per agent in each Codex
+  Activity-run snapshot.
 - Pipeline-run, step, and Activity-run status.
 - Queue ordering, claim leases, continuation tokens, and idempotency records.
-- Model generation, reviewer decisions, and planned file operations.
+- Shared direct, refinement, and roundtable turn scheduling and planned file
+  operations.
 - Terminal failure reasons and cancellation decisions.
 
 Only the API persists a transition such as `queued -> claimed`,
@@ -50,6 +52,8 @@ actions in that checkout. Its responsibilities are:
 - Reporting the outcome of each local checkpoint to the API.
 - Passing the API-frozen Codex model to the local CLI and reporting the
   requested and actual model observations.
+- Executing the selected writer, proposal, review, or aggregator turn without
+  owning the loop's state machine.
 - Identifying each Harness observation with its schema version and frozen
   Harness implementation.
 - Preserving Codex timestamps, duration, session, token usage, exit status,

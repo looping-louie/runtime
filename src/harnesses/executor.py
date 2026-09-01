@@ -8,6 +8,11 @@ from pathlib import Path
 from harnesses.codex_cli import execute_codex_cli
 
 
+HARNESS_ADAPTERS = {
+    ('codex_cli', 'v1'): execute_codex_cli,
+}
+
+
 def execute_harness(
     response: Mapping[str, object],
     checkout_path: Path,
@@ -16,8 +21,12 @@ def execute_harness(
 
     payload = response.get('payload')
     harness = payload.get('harness') if isinstance(payload, Mapping) else None
-    if isinstance(harness, Mapping) and (
-        harness.get('kind'), harness.get('version')
-    ) == ('codex_cli', 'v1'):
-        return execute_codex_cli(response, checkout_path)
-    raise RuntimeError('Activity response selects an unsupported Harness.')
+    identity = (
+        (harness.get('kind'), harness.get('version'))
+        if isinstance(harness, Mapping)
+        else None
+    )
+    adapter = HARNESS_ADAPTERS.get(identity)
+    if adapter is None:
+        raise RuntimeError('Activity response selects an unsupported Harness.')
+    return adapter(response, checkout_path)
