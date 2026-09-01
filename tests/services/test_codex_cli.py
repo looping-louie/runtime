@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from harnesses.codex_cli import executor as codex_cli
+from tests.contract_fixtures import load_harness_observation
 
 
 @pytest.fixture(autouse=True)
@@ -71,7 +72,12 @@ def completed_events(
         }),
         json.dumps({
             'type': 'turn.completed',
-            'usage': {'input_tokens': 2, 'output_tokens': 3},
+            'usage': {
+                'input_tokens': 2,
+                'cached_input_tokens': 1,
+                'output_tokens': 3,
+                'total_tokens': 5,
+            },
         }),
     )) + '\n'
 
@@ -142,33 +148,9 @@ def test_execute_codex_cli_reports_completed_turn(
         'Keep public API contracts backwards compatible.\n'
     ]
     assert not (tmp_path / '.agents' / 'skills' / 'api-compatibility').exists()
-    assert result == {
-        'action': 'run_harness',
-        'schema_version': 'v1',
-        'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
-        'completed': True,
-        'started_at': '2026-08-31T10:00:00+00:00',
-        'completed_at': '2026-08-31T10:00:00.250000+00:00',
-        'duration_ms': 250,
-        'final_response': 'Done.',
-        'commit_message': 'feat: complete requested change',
-        'requested_model': 'gpt-5-codex',
-        'actual_model': 'gpt-5.1-codex',
-        'reasoning_effort': None,
-        'session_reference': 'thread-1',
-        'exit_code': 0,
-        'materialized_skills': [{
-            'id': 'skill-api',
-            'name': 'api-compatibility',
-            'version': 3,
-        }],
-        'source_commit_sha': 'source-sha',
-        'final_commit_sha': 'source-sha',
-        'final_diff': 'diff --git a/a b/a',
-        'changed_files': ['a.txt'],
-        'usage': {'input_tokens': 2, 'output_tokens': 3},
-        'diagnostics': [],
-    }
+    expected = load_harness_observation('codex_cli_v1_completed.json')
+    expected.pop('error')
+    assert result == {'action': 'run_harness', **expected}
 
 
 def test_execute_codex_cli_removes_materialized_skills_after_failure(

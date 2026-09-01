@@ -14,6 +14,7 @@ from harnesses.codex_cli.observations import (
     enrich_with_session_settings,
     parse_codex_events,
 )
+from tests.contract_fixtures import load_harness_observation
 
 
 def instruction_snapshot() -> dict[str, object]:
@@ -79,7 +80,8 @@ def test_failed_process_keeps_partial_session_tokens_and_checkout_state(
         stdout = '\n'.join((
             json.dumps({'type': 'thread.started', 'thread_id': 'thread-partial'}),
             json.dumps({
-                'type': 'turn.completed',
+                'type': 'turn.failed',
+                'message': 'Codex emitted a partial response.',
                 'usage': {
                     'input_tokens': 10,
                     'cached_input_tokens': 4,
@@ -101,18 +103,7 @@ def test_failed_process_keeps_partial_session_tokens_and_checkout_state(
         },
     }, tmp_path)
 
-    assert result['completed'] is False
-    assert result['exit_code'] == 17
-    assert result['session_reference'] == 'thread-partial'
-    assert result['usage'] == {
-        'input_tokens': 10,
-        'cached_input_tokens': 4,
-        'output_tokens': 3,
-        'reasoning_output_tokens': 2,
+    assert result == {
+        'action': 'run_harness',
+        **load_harness_observation('codex_cli_v1_failed.json'),
     }
-    assert result['diagnostics'] == ['boom']
-    assert result['source_commit_sha'] == 'source-sha'
-    assert result['final_commit_sha'] == 'source-sha'
-    assert result['final_diff'] == 'partial diff'
-    assert result['changed_files'] == ['partial.py']
-    assert result['duration_ms'] == 1000
