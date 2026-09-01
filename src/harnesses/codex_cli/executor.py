@@ -104,6 +104,8 @@ def execute_codex_cli(response: Mapping[str, object], checkout_path: Path) -> di
     completed_at = _utc_now()
     harness_result: dict[str, object] = {
         'action': 'run_harness',
+        'schema_version': 'v1',
+        'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
         'completed': error_message is None,
         'started_at': started_at.isoformat(),
         'completed_at': completed_at.isoformat(),

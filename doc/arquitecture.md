@@ -73,6 +73,7 @@ src/
 |-- executor.py            Coordinates local checkpoint execution for a claim
 |-- harnesses/
 |   |-- capabilities.py    Detects executable and authenticated Harnesses
+|   |-- executor.py        Routes frozen Harnesses to local adapters
 |   `-- codex_cli/         Runs Codex, materializes instructions, and captures
 |                          JSONL plus local-session observations
 |-- services/
@@ -157,6 +158,11 @@ runtime supplements it with effective model and effort from the matching local
 Codex session `turn_context`. If that metadata is absent, the requested model is
 reported as actual and effort remains unknown. Codex authentication remains
 local and API Linked Services are not used by this Harness.
+
+The checkpoint result also carries `schema_version=v1` and the frozen Harness
+identity. These discriminate the common observation envelope without moving
+Codex-specific parsing, session lookup, or Skill materialization out of its
+adapter. The API validates and durably normalizes the submitted observation.
 
 ### `submit_review_input`
 

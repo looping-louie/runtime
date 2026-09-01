@@ -50,6 +50,8 @@ actions in that checkout. Its responsibilities are:
 - Reporting the outcome of each local checkpoint to the API.
 - Passing the API-frozen Codex model to the local CLI and reporting the
   requested and actual model observations.
+- Identifying each Harness observation with its schema version and frozen
+  Harness implementation.
 - Preserving Codex timestamps, duration, session, token usage, exit status,
   diagnostics, versioned Skills, Git state, diff, files, and final response even
   when the local process fails.

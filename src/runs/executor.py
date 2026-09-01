@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Protocol
 from uuid import uuid4
 
-from harnesses.codex_cli import execute_codex_cli
+from harnesses.executor import execute_harness
 from harnesses.louie import execute_louie_action, prepare_louie_execution
 from runs.lease_keepalive import LeaseKeepalive
 from runs.models import ClaimedPipelineRun
@@ -77,7 +77,7 @@ class ActivityExecutor:
         *,
         activity_client: ActivityCheckpointClient,
         pipeline_client: PipelineContinuationClient,
-        harness_runner: Callable[[dict[str, object], Path], dict[str, object]] = execute_codex_cli,
+        harness_runner: Callable[[dict[str, object], Path], dict[str, object]] = execute_harness,
         lease_keepalive_interval_seconds: float = LEASE_KEEPALIVE_INTERVAL_SECONDS,
     ) -> None:
         """Store the API clients used to complete Activity and Pipeline runs."""

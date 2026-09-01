@@ -144,6 +144,8 @@ def test_execute_codex_cli_reports_completed_turn(
     assert not (tmp_path / '.agents' / 'skills' / 'api-compatibility').exists()
     assert result == {
         'action': 'run_harness',
+        'schema_version': 'v1',
+        'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
         'completed': True,
         'started_at': '2026-08-31T10:00:00+00:00',
         'completed_at': '2026-08-31T10:00:00.250000+00:00',
