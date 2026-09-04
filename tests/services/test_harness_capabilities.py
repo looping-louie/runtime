@@ -23,8 +23,23 @@ def test_detect_harnesses_includes_authenticated_codex() -> None:
 
     capabilities = detect_harness_capabilities(run=run)
 
-    assert capabilities == ('louie', 'codex_cli')
-    assert calls == [['codex', 'login', 'status']]
+    assert capabilities == ('louie', 'codex_cli', 'copilot_cli')
+    assert calls == [['codex', 'login', 'status'], ['copilot', '--version']]
+
+
+def test_detect_harnesses_includes_available_copilot() -> None:
+    """Copilot is advertised after its executable preflight succeeds."""
+
+    calls: list[list[str]] = []
+
+    def run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        """Record successful Harness preflight commands."""
+
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, '', '')
+
+    assert detect_harness_capabilities(run=run) == ('louie', 'codex_cli', 'copilot_cli')
+    assert calls[-1] == ['copilot', '--version']
 
 
 def test_detect_harnesses_omits_unauthenticated_codex() -> None:
