@@ -7,18 +7,16 @@ import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 
-from harnesses.codex_cli.executor import (
-    _checkout_state,
-    _monotonic,
-    _parse_completion,
-    _process_output,
-    _prompt,
-    _require_instruction_snapshot,
-    _require_payload,
-    _require_requested_model,
-    _turn,
-    _utc_now,
-)
+from harnesses.cli_common import build_prompt as _prompt
+from harnesses.cli_common import checkout_state as _checkout_state
+from harnesses.cli_common import monotonic_now as _monotonic
+from harnesses.cli_common import parse_completion as _parse_completion
+from harnesses.cli_common import process_output as _process_output
+from harnesses.cli_common import require_instruction_snapshot as _require_instruction_snapshot
+from harnesses.cli_common import require_payload as _require_payload
+from harnesses.cli_common import require_requested_model as _require_requested_model
+from harnesses.cli_common import turn as _turn
+from harnesses.cli_common import utc_now as _utc_now
 from services.checkout.repository import get_head_sha
 
 from .instructions import materialize_instruction_snapshot
@@ -90,6 +88,7 @@ def execute_copilot_cli(
                 observations.completion,
                 require_commit_message=not commit_forbidden,
                 phase=str(_turn(payload).get('phase', 'execute')),
+                harness_name='Copilot',
             )
         except ValueError as error:
             error_message = error_message or str(error)

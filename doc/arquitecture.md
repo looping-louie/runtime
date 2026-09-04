@@ -74,7 +74,9 @@ src/
 |-- executor.py            Coordinates local checkpoint execution for a claim
 |-- harnesses/
 |   |-- capabilities.py    Detects executable and authenticated Harnesses
+|   |-- cli_common.py      Defines shared CLI turn and result-contract helpers
 |   |-- executor.py        Routes frozen Harnesses to local adapters
+|   |-- instructions.py    Validates and materializes shared instruction snapshots
 |   |-- codex_cli/         Runs Codex, materializes instructions, and captures
 |   |                      JSONL plus local-session observations
 |   `-- copilot_cli/       Runs Copilot, materializes instructions, and captures

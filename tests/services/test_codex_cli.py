@@ -26,8 +26,9 @@ def stable_observation_clocks(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(codex_cli, '_utc_now', lambda: next(timestamps))
     monkeypatch.setattr(codex_cli, '_monotonic', lambda: next(ticks))
     monkeypatch.setattr(codex_cli, 'get_head_sha', lambda _path: 'source-sha')
-    monkeypatch.setattr(codex_cli, 'get_git_diff', lambda _path: '')
-    monkeypatch.setattr(codex_cli, 'get_changed_files', lambda _path: [])
+    monkeypatch.setattr(
+        codex_cli, '_checkout_state', lambda _path: ('source-sha', '', [])
+    )
 
 
 def completed_events(
@@ -92,8 +93,11 @@ def test_execute_codex_cli_reports_completed_turn(
         )
 
     monkeypatch.setattr(codex_cli.subprocess, 'run', run)
-    monkeypatch.setattr(codex_cli, 'get_git_diff', lambda _path: 'diff --git a/a b/a')
-    monkeypatch.setattr(codex_cli, 'get_changed_files', lambda _path: ['a.txt'])
+    monkeypatch.setattr(
+        codex_cli,
+        '_checkout_state',
+        lambda _path: ('source-sha', 'diff --git a/a b/a', ['a.txt']),
+    )
 
     result = codex_cli.execute_codex_cli(codex_activity(
         'Create a file.',
@@ -255,8 +259,9 @@ def test_execute_codex_cli_accepts_no_message_when_commit_is_forbidden(
         )
 
     monkeypatch.setattr(codex_cli.subprocess, 'run', run)
-    monkeypatch.setattr(codex_cli, 'get_git_diff', lambda _path: '')
-    monkeypatch.setattr(codex_cli, 'get_changed_files', lambda _path: [])
+    monkeypatch.setattr(
+        codex_cli, '_checkout_state', lambda _path: ('source-sha', '', [])
+    )
 
     result = codex_cli.execute_codex_cli(codex_activity(
         'Inspect the project.', commit_mode='forbid',

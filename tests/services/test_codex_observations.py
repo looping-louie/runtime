@@ -56,8 +56,11 @@ def test_failed_process_keeps_partial_session_tokens_and_checkout_state(
     monkeypatch.setattr(codex_cli, '_utc_now', lambda: next(timestamps))
     monkeypatch.setattr(codex_cli, '_monotonic', lambda: next(ticks))
     monkeypatch.setattr(codex_cli, 'get_head_sha', lambda _path: 'source-sha')
-    monkeypatch.setattr(codex_cli, 'get_git_diff', lambda _path: 'partial diff')
-    monkeypatch.setattr(codex_cli, 'get_changed_files', lambda _path: ['partial.py'])
+    monkeypatch.setattr(
+        codex_cli,
+        '_checkout_state',
+        lambda _path: ('source-sha', 'partial diff', ['partial.py']),
+    )
 
     def run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
         """Return a failed process with useful JSONL already written."""
