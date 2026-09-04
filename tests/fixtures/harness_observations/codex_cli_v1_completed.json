@@ -1,0 +1,40 @@
+{
+  "schema_version": "v1",
+  "harness": {
+    "kind": "codex_cli",
+    "version": "v1",
+    "config": {}
+  },
+  "completed": true,
+  "started_at": "2026-08-31T10:00:00+00:00",
+  "completed_at": "2026-08-31T10:00:00.250000+00:00",
+  "duration_ms": 250,
+  "requested_model": "gpt-5-codex",
+  "actual_model": "gpt-5.1-codex",
+  "reasoning_effort": null,
+  "session_reference": "thread-1",
+  "usage": {
+    "input_tokens": 2,
+    "cached_input_tokens": 1,
+    "output_tokens": 3,
+    "total_tokens": 5
+  },
+  "exit_code": 0,
+  "diagnostics": [],
+  "materialized_skills": [
+    {
+      "id": "skill-api",
+      "name": "api-compatibility",
+      "version": 3
+    }
+  ],
+  "source_commit_sha": "source-sha",
+  "final_commit_sha": "source-sha",
+  "final_diff": "diff --git a/a b/a",
+  "changed_files": [
+    "a.txt"
+  ],
+  "final_response": "Done.",
+  "error": null,
+  "commit_message": "feat: complete requested change"
+}

@@ -4,51 +4,56 @@ from __future__ import annotations
 
 from urllib.parse import quote
 
-import httpx
+from clients.api_client import RuntimeApiClient
 
 
-class WorkerHeartbeatClient:
-    """Refresh provisioned runtime worker liveness with the API control plane."""
+class WorkerHeartbeatClient(RuntimeApiClient):
+    """Provision runtime workers and refresh their API liveness."""
 
-    def __init__(
+    def provision(
         self,
         *,
-        api_base_url: str,
-        client: httpx.Client | None = None,
-    ) -> None:
-        """Store the API endpoint and optionally inject an HTTP client for tests."""
+        project_id: str,
+        harnesses: tuple[str, ...],
+    ) -> str:
+        """Create one worker with detected capabilities and return its API ID."""
 
-        self._api_base_url = api_base_url.rstrip('/')
-        self._client = client or httpx.Client(timeout=60.0)
-
-    def heartbeat(self, *, project_id: str, worker_id: str) -> None:
-        """Record a liveness heartbeat for one registered runtime worker."""
-
-        self._request(
+        response = self._request_object(
             method='POST',
             project_id=project_id,
-            worker_id=worker_id,
+            path='/workers',
+            operation='Worker lifecycle',
+            object_error='Worker lifecycle response must be a JSON object.',
+            payload=_capability_payload(harnesses),
         )
+        worker_id = response.get('id')
+        if not isinstance(worker_id, str) or not worker_id:
+            raise RuntimeError('Worker provisioning response is missing its ID.')
+        return worker_id
 
-    def _request(
+    def heartbeat(
         self,
         *,
-        method: str,
         project_id: str,
         worker_id: str,
+        harnesses: tuple[str, ...],
     ) -> None:
-        """Submit one worker lifecycle request and require a successful response."""
+        """Record a liveness heartbeat for one registered runtime worker."""
 
-        try:
-            response = self._client.request(
-                method,
-                f'{self._api_base_url}/workers/{quote(worker_id, safe="")}/heartbeat',
-                headers={'X-Project-ID': project_id},
-            )
-        except httpx.RequestError as exc:
-            raise RuntimeError(f'Worker lifecycle request failed: {exc}') from exc
-        if response.is_error:
-            raise RuntimeError(
-                f'Worker lifecycle request returned HTTP {response.status_code}: '
-                f'{response.text}'
-            )
+        self._request_object(
+            method='POST',
+            project_id=project_id,
+            path=f'/workers/{quote(worker_id, safe="")}/heartbeat',
+            operation='Worker lifecycle',
+            object_error='Worker lifecycle response must be a JSON object.',
+            payload=_capability_payload(harnesses),
+        )
+
+
+def _capability_payload(harnesses: tuple[str, ...]) -> dict[str, object]:
+    """Serialize detected Harness identities for worker lifecycle requests."""
+
+    return {'harnesses': [
+        {'kind': harness, 'version': 'v1', 'config': {}}
+        for harness in harnesses
+    ]}

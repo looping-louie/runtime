@@ -2,25 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
 from urllib.parse import quote
 
-import httpx
+from clients.api_client import RuntimeApiClient
 
 
-class ActivityRunClient:
+class ActivityRunClient(RuntimeApiClient):
     """Fetch and advance Activity runs allocated to a claimed Pipeline run."""
 
-    def __init__(
-        self,
-        *,
-        api_base_url: str,
-        client: httpx.Client | None = None,
-    ) -> None:
-        """Store the API endpoint and optionally inject an HTTP client for tests."""
-
-        self._api_base_url = api_base_url.rstrip('/')
-        self._client = client or httpx.Client(timeout=300.0)
+    request_timeout_seconds = 300.0
 
     def get_run(
         self,
@@ -31,10 +21,12 @@ class ActivityRunClient:
     ) -> dict[str, object]:
         """Return one project-scoped Activity run from the API."""
 
-        return self._request(
+        return self._request_object(
             method='GET',
             project_id=project_id,
             path=self._run_path(activity_id=activity_id, run_id=run_id),
+            operation='Activity checkpoint',
+            object_error='Activity checkpoint response must be a JSON object.',
         )
 
     def continue_run(
@@ -51,10 +43,12 @@ class ActivityRunClient:
     ) -> dict[str, object]:
         """Submit one idempotent local checkpoint result and return the next state."""
 
-        return self._request(
+        return self._request_object(
             method='POST',
             project_id=project_id,
             path=f'{self._run_path(activity_id=activity_id, run_id=run_id)}/continue',
+            operation='Activity checkpoint',
+            object_error='Activity checkpoint response must be a JSON object.',
             payload={
                 'pipeline_run_id': pipeline_run_id,
                 'lease_token': lease_token,
@@ -63,35 +57,6 @@ class ActivityRunClient:
                 'result': result,
             },
         )
-
-    def _request(
-        self,
-        *,
-        method: str,
-        project_id: str,
-        path: str,
-        payload: dict[str, object] | None = None,
-    ) -> dict[str, object]:
-        """Send one checkpoint request and require an Activity-run object response."""
-
-        try:
-            response = self._client.request(
-                method,
-                f'{self._api_base_url}{path}',
-                json=payload,
-                headers={'X-Project-ID': project_id},
-            )
-        except httpx.RequestError as exc:
-            raise RuntimeError(f'Activity checkpoint request failed: {exc}') from exc
-        if response.is_error:
-            raise RuntimeError(
-                f'Activity checkpoint request returned HTTP {response.status_code}: '
-                f'{response.text}'
-            )
-        value: Any = response.json()
-        if not isinstance(value, dict):
-            raise RuntimeError('Activity checkpoint response must be a JSON object.')
-        return value
 
     @staticmethod
     def _run_path(*, activity_id: str, run_id: str) -> str:

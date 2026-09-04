@@ -13,6 +13,8 @@ is the local execution plane for the projects in its configuration.
 The runtime owns:
 
 - Mapping project IDs to explicitly configured local Git checkouts.
+- Propagating the configured User identity on every API request.
+- Detecting local Harness capabilities and provisioning missing worker IDs.
 - Inspecting repository state and collecting bounded context.
 - Applying validated filesystem operations.
 - Evaluating the local Git commit policy and creating allowed commits.
@@ -45,6 +47,13 @@ The worker polls at most one run per configured project per cycle. A
 from being polled. The runner retries operational failures after the configured
 delay. Unexpected errors stop the process.
 
+When a project lacks a worker ID, the runtime detects whether the configured
+Codex executable is installed and authenticated, registers the worker once
+with the detected Harness set, and persists the returned API ID atomically in
+the runtime JSON. The same detector refreshes at most every 30 seconds and each
+heartbeat replaces the API's observed Harness set. The worker advertises local
+Harness health only; it does not attempt to enumerate models accepted by Codex.
+
 ## Source Structure
 
 Runtime source modules are grouped by ownership. Composition, polling, and
@@ -54,14 +63,19 @@ local Git operations have dedicated packages.
 ```text
 src/
 |-- main.py                Builds configured clients, worker, and polling loop
-|-- config.py              Parses local configuration and validates checkouts
-|-- worker.py              Polls project queues and isolates project errors
-|-- runner.py              Repeats bounded poll cycles with operational retry
+|-- configuration/         Parses configuration and persists provisioned IDs
+|-- provisioning.py        Creates missing workers and persists their IDs
+|-- polling/               Polls project queues with operational retry
 |-- clients/
 |   |-- pipeline_client.py
 |   |                       Claims, renews, and advances Pipeline runs over HTTP
 |   `-- activity_client.py Reads and checkpoints Activity runs over HTTP
 |-- executor.py            Coordinates local checkpoint execution for a claim
+|-- harnesses/
+|   |-- capabilities.py    Detects executable and authenticated Harnesses
+|   |-- executor.py        Routes frozen Harnesses to local adapters
+|   `-- codex_cli/         Runs Codex, materializes instructions, and captures
+|                          JSONL plus local-session observations
 |-- services/
 |   `-- git/
 |       |-- repository_context.py  Inspects Git state and builds bounded context
@@ -90,13 +104,15 @@ tests/
 ### Composition
 
 `main.py` is the composition root. It loads and validates `RuntimeConfig`,
-creates the two HTTP clients, passes them to `ActivityExecutor`, and constructs
-`RuntimeWorker` with the executor callback. It then invokes `run_forever`.
+constructs the cached local-Harness detector, provisions missing workers,
+creates the HTTP clients, passes them to `ActivityExecutor`, and constructs
+`RuntimeWorker` with the executor callback and capability supplier. It then
+invokes `run_forever`.
 
 Dependency flow is:
 
 ```text
-main -> config, clients, executor, worker, runner
+main -> configuration, capabilities, provisioning, clients, executor, polling
 worker -> ClaimClient, executor callback
 executor -> activity client, pipeline client, services.git
 clients -> HTTP API
@@ -121,6 +137,35 @@ data and the source commit SHA to the API.
 Validate and apply planned create, replace, replace-text, and delete
 operations. Return the application outcome, diff, and changed files.
 
+### `run_harness`
+
+Validate the API-frozen `codex_cli` Harness and the pending turn's requested
+model and instruction snapshot. Pass the model through `codex exec --model`, inject the Persona
+content into the task prompt, and materialize each Skill for the duration of
+the Codex process at `.agents/skills/<normalized-name>/SKILL.md`.
+Each selected Skill is referenced explicitly in the prompt by its normalized
+`$name`. Temporary Skill directories are removed before diff collection and
+are also removed when the process fails. A checkout-owned directory with the
+same Skill name is never overwritten. The prompt forbids Codex from creating a
+Git commit. Writer and aggregator turns require a machine-readable final summary
+plus a commit proposal for commit-enabled runs; proposal and review turns use
+read-only sandboxing and return structured output. That output and the turn
+identity, role, phase, and iteration are submitted through `run_harness`; Git
+is executed only after the API returns `commit_if_allowed`. Successful results
+and failures report timestamps, duration, requested and actual model, reasoning
+effort, session reference, all token counters, exit code, diagnostics,
+materialized Skill versions, source and final Git SHAs, diff, changed files,
+and any final response. The public JSONL stream supplies partial turn data; the
+runtime supplements it with effective model and effort from the matching local
+Codex session `turn_context`. If that metadata is absent, the requested model is
+reported as actual and effort remains unknown. Codex authentication remains
+local and API Linked Services are not used by this Harness.
+
+The checkpoint result also carries `schema_version=v1` and the frozen Harness
+identity. These discriminate the common observation envelope without moving
+Codex-specific parsing, session lookup, or Skill materialization out of its
+adapter. The API validates and durably normalizes the submitted observation.
+
 ### `submit_review_input`
 
 Read the final diff and bounded changed-file contents. Return the review input.
@@ -136,8 +181,9 @@ an implicit checkpoint or Pipeline completion.
 
 ## Local State and Git Boundaries
 
-The runtime stores no run state locally. API Pipeline and Activity runs are the
-source of truth for progress, retry tokens, and scheduling.
+The runtime stores no run state locally. It persists only API-generated worker
+IDs in its configuration after initial provisioning. API Pipeline and Activity
+runs remain the source of truth for progress, retry tokens, and scheduling.
 
 The configured checkout is the local side-effect boundary. Before the worker
 starts, every checkout must be a clean Git repository. During execution:
@@ -158,6 +204,8 @@ protection, commit metadata, or repository state blocks the action.
 A successful claim includes a secret lease token. The executor renews that
 lease before every Activity checkpoint and before Pipeline continuation. It
 also submits the Pipeline run ID and lease token with every Activity checkpoint.
+During a blocking `codex_cli` turn, a background keepalive renews the lease
+every 30 seconds. If renewal fails, the completed local turn is not submitted.
 
 The API validates lease ownership before generation and again atomically when
 it persists an Activity or Pipeline transition. A runtime whose lease has

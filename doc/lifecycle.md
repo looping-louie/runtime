@@ -23,9 +23,12 @@ local checkout.
 The API is the control plane and source of truth for:
 
 - Pipeline definitions, Activity definitions, and their immutable run snapshots.
+- Effective model and instruction selection frozen per agent in each Codex
+  Activity-run snapshot.
 - Pipeline-run, step, and Activity-run status.
 - Queue ordering, claim leases, continuation tokens, and idempotency records.
-- Model generation, reviewer decisions, and planned file operations.
+- Shared direct, refinement, and roundtable turn scheduling and planned file
+  operations.
 - Terminal failure reasons and cancellation decisions.
 
 Only the API persists a transition such as `queued -> claimed`,
@@ -38,15 +41,43 @@ to a configured clean Git checkout, then performs the API-directed checkpoint
 actions in that checkout. Its responsibilities are:
 
 - Polling configured projects and claiming at most one run per project.
+- Propagating the configured User identity in all API communication.
+- Provisioning each missing worker once with locally detected Harnesses.
+- Re-detecting local Harness health and reporting the current set on heartbeat.
 - Renewing the active Pipeline lease before every state-changing checkpoint.
 - Collecting bounded repository context.
 - Applying validated planned file operations.
 - Supplying review input from the final local diff.
 - Evaluating local Git policy and committing allowed changes.
 - Reporting the outcome of each local checkpoint to the API.
+- Passing the API-frozen Codex model to the local CLI and reporting the
+  requested and actual model observations.
+- Executing the selected writer, proposal, review, or aggregator turn without
+  owning the loop's state machine.
+- Identifying each Harness observation with its schema version and frozen
+  Harness implementation.
+- Preserving Codex timestamps, duration, session, token usage, exit status,
+  diagnostics, versioned Skills, Git state, diff, files, and final response even
+  when the local process fails.
 
 The runtime must never choose a checkout from an API response or update a
 Pipeline or Activity status in local storage.
+
+## Worker Provisioning And Polling
+
+For a project mapping without `worker_id`, the runtime checks the configured
+Codex executable and local login. It always supports `louie`; it adds
+`codex_cli` only when both checks succeed. The project is then registered
+through `POST /workers`, and the returned ID is persisted immediately in the
+runtime JSON. Later starts reuse that ID and follow the existing heartbeat and
+polling flow. During polling, a shared detector refreshes at most every 30
+seconds and each project heartbeat replaces the API's observed Harness set.
+Consequently a queued Codex run becomes claimable after a successful local
+login without reprovisioning the worker or recreating the run. The runtime does
+not enumerate Codex models; the API freezes the requested model and the CLI is
+the execution-time authority for whether that authenticated account accepts
+it. All API requests carry the configured `X-User-ID` and the project-specific
+`X-Project-ID`.
 
 ## Normal Execution
 

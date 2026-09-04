@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
+import stat
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -15,8 +18,17 @@ class ProjectCheckout:
     """One API project and the checkout a runtime may execute within."""
 
     project_id: str
-    worker_id: str
+    worker_id: str | None
     repository_path: Path
+
+    def require_worker_id(self) -> str:
+        """Return the persisted worker identity after initial provisioning."""
+
+        if self.worker_id is None:
+            raise ValueError(
+                f'Project {self.project_id!r} has not been provisioned with a worker_id.'
+            )
+        return self.worker_id
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +36,7 @@ class RuntimeConfig:
     """Runtime connection settings and authorized project checkouts."""
 
     api_base_url: str
+    user_id: str
     poll_interval_seconds: float
     projects: tuple[ProjectCheckout, ...]
 
@@ -70,11 +83,12 @@ def load_config(path: str | Path) -> RuntimeConfig:
         raise ValueError('Runtime configuration must be a JSON object.')
     _reject_unknown_fields(
         raw,
-        {'api_base_url', 'poll_interval_seconds', 'projects'},
+        {'api_base_url', 'user_id', 'poll_interval_seconds', 'projects'},
         'Runtime configuration',
     )
     return RuntimeConfig(
         api_base_url=_require_http_url(raw.get('api_base_url'), 'api_base_url'),
+        user_id=_require_text(raw.get('user_id'), 'user_id'),
         poll_interval_seconds=_require_positive_number(
             raw.get('poll_interval_seconds'), 'poll_interval_seconds',
         ),
@@ -104,7 +118,9 @@ def _parse_projects(value: object) -> tuple[ProjectCheckout, ...]:
         projects.append(
             ProjectCheckout(
                 project_id=project_id,
-                worker_id=_require_text(item.get('worker_id'), f'projects[{index}].worker_id'),
+                worker_id=_optional_text(
+                    item.get('worker_id'), f'projects[{index}].worker_id',
+                ),
                 repository_path=Path(
                     _require_text(
                         item.get('repository_path'),
@@ -114,6 +130,68 @@ def _parse_projects(value: object) -> tuple[ProjectCheckout, ...]:
             )
         )
     return tuple(projects)
+
+
+def persist_worker_id(
+    path: str | Path,
+    *,
+    project_id: str,
+    worker_id: str,
+) -> None:
+    """Atomically persist one API-generated worker ID in the runtime JSON file."""
+
+    config_path = Path(path)
+    raw = _read_json_object(config_path)
+    projects = raw.get('projects')
+    if not isinstance(projects, list):
+        raise ValueError('projects must be an array before worker provisioning.')
+    normalized_worker_id = _require_text(worker_id, 'worker_id')
+    for item in projects:
+        if isinstance(item, dict) and item.get('project_id') == project_id:
+            existing = item.get('worker_id')
+            if existing not in (None, normalized_worker_id):
+                raise ValueError(
+                    f'Project {project_id!r} already has a different worker_id.'
+                )
+            item['worker_id'] = normalized_worker_id
+            _atomic_write_json(config_path, raw)
+            return
+    raise ValueError(f'Project {project_id!r} is absent from runtime configuration.')
+
+
+def _read_json_object(path: Path) -> dict[str, Any]:
+    """Read a JSON object for a provisioning-safe configuration update."""
+
+    try:
+        value = json.loads(path.read_text(encoding='utf-8'))
+    except OSError as exc:
+        raise ValueError(f'Could not read runtime configuration {path}: {exc}') from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f'Runtime configuration {path} is not valid JSON.') from exc
+    if not isinstance(value, dict):
+        raise ValueError('Runtime configuration must be a JSON object.')
+    return value
+
+
+def _atomic_write_json(path: Path, value: dict[str, Any]) -> None:
+    """Replace a configuration file without exposing a partial worker ID write."""
+
+    mode = stat.S_IMODE(path.stat().st_mode)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode='w', encoding='utf-8', dir=path.parent, delete=False,
+        ) as temporary:
+            temporary_path = Path(temporary.name)
+            json.dump(value, temporary, indent=2)
+            temporary.write('\n')
+            temporary.flush()
+            os.fsync(temporary.fileno())
+        temporary_path.chmod(mode)
+        os.replace(temporary_path, path)
+    finally:
+        if temporary_path is not None and temporary_path.exists():
+            temporary_path.unlink()
 
 
 def _require_http_url(value: object, field_name: str) -> str:
@@ -140,6 +218,14 @@ def _require_text(value: object, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f'{field_name} must be a non-empty string.')
     return value.strip()
+
+
+def _optional_text(value: object, field_name: str) -> str | None:
+    """Return an optional non-empty configuration string."""
+
+    if value is None:
+        return None
+    return _require_text(value, field_name)
 
 
 def _has_uncommitted_changes(checkout_path: Path) -> bool:
