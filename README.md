@@ -45,7 +45,9 @@ both `--version` and `login status`. The same detection is refreshed while the
 worker runs and the current Harness set is sent with each project heartbeat.
 Installing Codex, logging in, or logging out therefore updates claim admission
 without replacing the persisted `worker_id`; detection is cached for 30
-seconds.
+seconds. It advertises `copilot_cli` when `LOUIE_COPILOT_COMMAND` (defaulting
+to `copilot`) passes `--version`; Copilot authentication is verified when the
+CLI executes the selected turn.
 
 The worker polls every configured project, claims at most one available run
 per project in each cycle, and waits for `poll_interval_seconds` before the
@@ -62,19 +64,16 @@ performs these checkpoint actions in the mapped checkout:
 	the checkout constitution to the API.
 - `apply_operations`: validates and atomically applies API-provided file
 	operations without permitting checkout escape or symbolic-link traversal.
-- `run_harness`: runs one API-selected `codex_cli` v1 agent turn through the
-  local Codex CLI. Direct writers and roundtable aggregators may modify the
-  checkout; roundtable proposals and refinement reviews use Codex's read-only
-  sandbox. It injects the turn's frozen Persona into the prompt, temporarily
-  materializes every frozen Skill as `.agents/skills/<name>/SKILL.md`, and
-  passes the API-frozen model through `codex exec --model`. It reports the final
-  phase, agent, iteration, structured output, response, timestamps and duration,
-  requested and actual model, reasoning
-  effort, proposed commit message, process exit, versioned Skills, source and
-  final Git commits, diff, changed files, usage, diagnostics, and session
-  reference to the API. Codex is explicitly
-  instructed to leave changes uncommitted. The temporary Skill directories are
-  removed before the checkout diff is collected.
+- `run_harness`: runs one API-selected `codex_cli` or `copilot_cli` v1 agent
+	turn through the corresponding local CLI. Both inject the frozen Persona,
+	pass the API-frozen model, forbid direct Git commits, and report the final
+	phase, agent, iteration, structured output, response, timestamps and duration,
+	models, proposed commit message, process exit, versioned Skills, source and
+	final Git commits, diff, changed files, usage, diagnostics, and session
+	reference to the API. Codex materializes Skills at
+	`.agents/skills/<name>/SKILL.md`; Copilot materializes them at
+	`.github/skills/<name>/SKILL.md`. Temporary Skill directories are removed
+	before the checkout diff is collected.
 - `submit_review_input`: sends the final Git diff and bounded changed-file
 	contents.
 - `commit_if_allowed`: enforces local `louie.yaml` Git policy, then commits an
@@ -101,12 +100,14 @@ project-to-checkout mapping in its local configuration. Repository context
 collection is read-only and does not stage untracked files or otherwise modify
 the Git index.
 
-For `codex_cli`, the model is selected by the API and supplied as
+For `codex_cli` and `copilot_cli`, the model is selected by the API and supplied as
 `requested_model`; the runtime refuses to use a local model default and passes
-the value to `codex exec --model`. It still reads machine-owned environment
+the value to the CLI `--model` option. It reads machine-owned environment
 settings: `LOUIE_CODEX_COMMAND` defaults to `codex`,
-`LOUIE_CODEX_SANDBOX` defaults to `workspace-write`, and
-`LOUIE_CODEX_TIMEOUT_SECONDS` defaults to `1800` seconds. Persona and Skill
+`LOUIE_CODEX_SANDBOX` defaults to `workspace-write`,
+`LOUIE_CODEX_TIMEOUT_SECONDS` defaults to `1800` seconds,
+`LOUIE_COPILOT_COMMAND` defaults to `copilot`, and
+`LOUIE_COPILOT_TIMEOUT_SECONDS` defaults to `1800` seconds. Persona and Skill
 content comes only from the immutable Activity snapshot supplied by the API;
 the runtime does not fetch mutable instruction resources during execution.
 Codex/OpenAI authentication remains local to the CLI and does not use API

@@ -21,10 +21,11 @@ a new kind of Pipeline, Activity, or ActivityRun.
 That identity is `ProjectCheckout.worker_id`. The API persists a durable
 project-scoped identity, recent heartbeat, and currently observed Harnesses for
 it, then stores the ID on claimed `pipeline_runs`. Every heartbeat replaces the
-capability set. The runtime always advertises `louie` and advertises
-`codex_cli` only while the configured executable and local login check succeed.
-It does not advertise models: model policy belongs to the API, while acceptance
-by the authenticated Codex account is ultimately an execution-time CLI result.
+capability set. The runtime always advertises `louie`, advertises `codex_cli`
+while the configured executable and local login check succeed, and advertises
+`copilot_cli` while the configured executable responds to `--version`. It does
+not advertise models: model policy belongs to the API, while acceptance by an
+authenticated CLI account is ultimately an execution-time result.
 
 ```mermaid
 sequenceDiagram
@@ -94,7 +95,8 @@ model that might be accepted. The heartbeat declaration is:
 {
   "harnesses": [
     {"kind": "louie", "version": "v1", "config": {}},
-    {"kind": "codex_cli", "version": "v1", "config": {}}
+    {"kind": "codex_cli", "version": "v1", "config": {}},
+    {"kind": "copilot_cli", "version": "v1", "config": {}}
   ]
 }
 ```
