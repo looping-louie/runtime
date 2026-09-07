@@ -1,59 +1,13 @@
 # Looping Louie Runtime Architecture
 
-Looping Louie Runtime is a local worker for Pipeline execution. It claims
-queued work from the Looping Louie API, executes API-directed local checkpoints
-in configured Git checkouts, and returns checkpoint results to the API.
+This document describes the software architecture of the Looping Louie Runtime.
+The temporary cross-repository product architecture is documented in
+[`ll-architecture.md`](ll-architecture.md). It defines the shared API/runtime
+ownership boundaries, Worker provisioning, Harness model, and execution flow.
 
-The runtime has no persistent database and does not make model, reviewer, or
-scheduling decisions. The API is the durable control plane. A runtime process
-is the local execution plane for the projects in its configuration.
-
-## System Boundary
-
-The runtime owns:
-
-- Mapping project IDs to explicitly configured local Git checkouts.
-- Propagating the configured User identity on every API request.
-- Detecting local Harness capabilities and provisioning missing worker IDs.
-- Inspecting repository state and collecting bounded context.
-- Applying validated filesystem operations.
-- Evaluating the local Git commit policy and creating allowed commits.
-- Polling, claiming, lease renewal, and checkpoint submission through the API.
-
-The API owns:
-
-- Pipeline definitions, runs, step scheduling, and durable state.
-- Activity-run state, continuation tokens, and idempotency records.
-- Model generation, reviewer decisions, and planned file operations.
-- Lease issuance and stale-worker fencing.
-
-The runtime never accepts a checkout path from an API response. It selects a
-checkout only through its local project mapping.
-
-## Execution Flow
-
-```mermaid
-flowchart LR
-R[Runtime worker] -->|Claim next Pipeline run| A[Looping Louie API]
-A -->|Run, Activity child, and lease token| R
-R -->|Read and execute checkpoint action| G[Configured Git checkout]
-R -->|Renew lease and submit checkpoint| A
-R -->|Continue Pipeline with lease token| A
-A -->|Next Activity child or terminal state| R
-```
-
-The worker polls at most one run per configured project per cycle. A
-`RuntimeError` in one project is logged without preventing other projects
-from being polled. The runner retries operational failures after the configured
-delay. Unexpected errors stop the process.
-
-When a project lacks a worker ID, the runtime detects whether the configured
-Codex executable is installed and authenticated, and whether the configured
-Copilot executable is available, registers the worker once with the detected
-Harness set, and persists the returned API ID atomically in the runtime JSON.
-The same detector refreshes at most every 30 seconds and each heartbeat replaces
-the API's observed Harness set. The worker advertises local Harness health only;
-it does not attempt to enumerate models accepted by either CLI.
+Looping Louie Runtime is a local worker for Pipeline execution. It executes
+API-directed local checkpoints in configured Git checkouts and returns their
+results to the API.
 
 ## Source Structure
 
