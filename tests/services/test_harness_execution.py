@@ -33,6 +33,29 @@ def test_execute_harness_routes_codex_v1(
     }
 
 
+def test_execute_harness_routes_copilot_v1(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """The common runner delegates Copilot checkpoints to the Copilot adapter."""
+
+    response = {
+        'payload': {
+            'harness': {'kind': 'copilot_cli', 'version': 'v1', 'config': {}},
+        },
+    }
+    monkeypatch.setitem(
+        executor.HARNESS_ADAPTERS,
+        ('copilot_cli', 'v1'),
+        lambda received, checkout: {'received': received, 'checkout': str(checkout)},
+    )
+
+    assert executor.execute_harness(response, tmp_path) == {
+        'received': response,
+        'checkout': str(tmp_path),
+    }
+
+
 def test_execute_harness_rejects_an_unknown_adapter(tmp_path: Path) -> None:
     """Unsupported frozen Harnesses fail before local execution begins."""
 

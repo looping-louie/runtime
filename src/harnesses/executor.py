@@ -5,10 +5,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 
+from harnesses.copilot_cli import execute_copilot_cli
 from harnesses.codex_cli import execute_codex_cli
 
 
 HARNESS_ADAPTERS = {
+    ('copilot_cli', 'v1'): execute_copilot_cli,
     ('codex_cli', 'v1'): execute_codex_cli,
 }
 

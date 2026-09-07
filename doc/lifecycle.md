@@ -66,17 +66,17 @@ Pipeline or Activity status in local storage.
 ## Worker Provisioning And Polling
 
 For a project mapping without `worker_id`, the runtime checks the configured
-Codex executable and local login. It always supports `louie`; it adds
-`codex_cli` only when both checks succeed. The project is then registered
+Codex executable and local login, and checks the configured Copilot executable
+with `--version`. It always supports `louie`; it adds `codex_cli` only when both
+Codex checks succeed and adds `copilot_cli` when the Copilot check succeeds. The project is then registered
 through `POST /workers`, and the returned ID is persisted immediately in the
 runtime JSON. Later starts reuse that ID and follow the existing heartbeat and
 polling flow. During polling, a shared detector refreshes at most every 30
 seconds and each project heartbeat replaces the API's observed Harness set.
 Consequently a queued Codex run becomes claimable after a successful local
 login without reprovisioning the worker or recreating the run. The runtime does
-not enumerate Codex models; the API freezes the requested model and the CLI is
-the execution-time authority for whether that authenticated account accepts
-it. All API requests carry the configured `X-User-ID` and the project-specific
+not enumerate CLI models; the API freezes the requested model and the CLI is the
+execution-time authority for whether that authenticated account accepts it. All API requests carry the configured `X-User-ID` and the project-specific
 `X-Project-ID`.
 
 ## Normal Execution

@@ -40,12 +40,18 @@ def detect_harness_capabilities(
     *,
     run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
 ) -> tuple[str, ...]:
-    """Advertise Codex only when its executable and local login are usable."""
+    """Advertise executable, authenticated Harness CLIs available locally."""
 
     capabilities = ['louie']
     command = os.environ.get('LOUIE_CODEX_COMMAND', 'codex').strip()
     if command and _command_succeeds([command, 'login', 'status'], run=run):
         capabilities.append('codex_cli')
+    copilot_command = os.environ.get('LOUIE_COPILOT_COMMAND', 'copilot').strip()
+    if copilot_command and _command_succeeds(
+        [copilot_command, '--version'],
+        run=run,
+    ):
+        capabilities.append('copilot_cli')
     return tuple(capabilities)
 
 

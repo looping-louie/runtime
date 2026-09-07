@@ -39,3 +39,21 @@ def codex_activity(
     if requested_model is not None:
         payload['requested_model'] = requested_model
     return {'input': instruction, 'payload': payload}
+
+
+def copilot_activity(
+    instruction: str,
+    *,
+    requested_model: str | None = 'gpt-5.6-terra',
+    **payload_overrides: object,
+) -> dict[str, object]:
+    """Build one API Activity response configured for the Copilot CLI Harness."""
+
+    payload: dict[str, object] = {
+        'harness': {'kind': 'copilot_cli', 'version': 'v1', 'config': {}},
+        'instruction_snapshot': instruction_snapshot(),
+        **payload_overrides,
+    }
+    if requested_model is not None:
+        payload['requested_model'] = requested_model
+    return {'input': instruction, 'payload': payload}

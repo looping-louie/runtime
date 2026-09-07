@@ -48,11 +48,12 @@ from being polled. The runner retries operational failures after the configured
 delay. Unexpected errors stop the process.
 
 When a project lacks a worker ID, the runtime detects whether the configured
-Codex executable is installed and authenticated, registers the worker once
-with the detected Harness set, and persists the returned API ID atomically in
-the runtime JSON. The same detector refreshes at most every 30 seconds and each
-heartbeat replaces the API's observed Harness set. The worker advertises local
-Harness health only; it does not attempt to enumerate models accepted by Codex.
+Codex executable is installed and authenticated, and whether the configured
+Copilot executable is available, registers the worker once with the detected
+Harness set, and persists the returned API ID atomically in the runtime JSON.
+The same detector refreshes at most every 30 seconds and each heartbeat replaces
+the API's observed Harness set. The worker advertises local Harness health only;
+it does not attempt to enumerate models accepted by either CLI.
 
 ## Source Structure
 
@@ -73,9 +74,13 @@ src/
 |-- executor.py            Coordinates local checkpoint execution for a claim
 |-- harnesses/
 |   |-- capabilities.py    Detects executable and authenticated Harnesses
+|   |-- cli_common.py      Defines shared CLI turn and result-contract helpers
 |   |-- executor.py        Routes frozen Harnesses to local adapters
-|   `-- codex_cli/         Runs Codex, materializes instructions, and captures
-|                          JSONL plus local-session observations
+|   |-- instructions.py    Validates and materializes shared instruction snapshots
+|   |-- codex_cli/         Runs Codex, materializes instructions, and captures
+|   |                      JSONL plus local-session observations
+|   `-- copilot_cli/       Runs Copilot, materializes instructions, and captures
+|                          JSONL observations
 |-- services/
 |   `-- git/
 |       |-- repository_context.py  Inspects Git state and builds bounded context
@@ -139,10 +144,12 @@ operations. Return the application outcome, diff, and changed files.
 
 ### `run_harness`
 
-Validate the API-frozen `codex_cli` Harness and the pending turn's requested
-model and instruction snapshot. Pass the model through `codex exec --model`, inject the Persona
-content into the task prompt, and materialize each Skill for the duration of
-the Codex process at `.agents/skills/<normalized-name>/SKILL.md`.
+Validate the API-frozen `codex_cli` or `copilot_cli` Harness and the pending
+turn's requested model and instruction snapshot. Pass the model to the selected
+CLI, inject the Persona content into the task prompt, and materialize each Skill
+for the duration of the process. Codex uses
+`.agents/skills/<normalized-name>/SKILL.md`; Copilot uses
+`.github/skills/<normalized-name>/SKILL.md`.
 Each selected Skill is referenced explicitly in the prompt by its normalized
 `$name`. Temporary Skill directories are removed before diff collection and
 are also removed when the process fails. A checkout-owned directory with the
@@ -158,12 +165,12 @@ materialized Skill versions, source and final Git SHAs, diff, changed files,
 and any final response. The public JSONL stream supplies partial turn data; the
 runtime supplements it with effective model and effort from the matching local
 Codex session `turn_context`. If that metadata is absent, the requested model is
-reported as actual and effort remains unknown. Codex authentication remains
-local and API Linked Services are not used by this Harness.
+reported as actual and effort remains unknown. CLI authentication remains local
+and API Linked Services are not used by either Harness.
 
 The checkpoint result also carries `schema_version=v1` and the frozen Harness
 identity. These discriminate the common observation envelope without moving
-Codex-specific parsing, session lookup, or Skill materialization out of its
+adapter-specific parsing, session lookup, or Skill materialization out of its
 adapter. The API validates and durably normalizes the submitted observation.
 
 ### `submit_review_input`
