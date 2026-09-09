@@ -19,10 +19,14 @@ src/
 |-- provisioning.py        Creates missing workers and persists their IDs
 |-- polling/               Polls project queues with operational retry
 |-- clients/
-|   |-- pipeline_client.py
-|   |                       Claims, renews, and advances Pipeline runs over HTTP
-|   `-- activity_client.py Reads and checkpoints Activity runs over HTTP
-|-- executor.py            Coordinates local checkpoint execution for a claim
+|   |-- api_client.py      Provides shared authenticated HTTP transport
+|   |-- activity_client.py Reads and checkpoints Activity runs over HTTP
+|   |-- pipeline_client.py Claims, renews, and advances Pipeline runs over HTTP
+|   `-- worker_client.py   Registers workers and sends heartbeats over HTTP
+|-- runs/
+|   |-- executor.py        Coordinates local checkpoint execution for a claim
+|   |-- lease_keepalive.py Renews leases during blocking Harness turns
+|   `-- models.py          Defines claimed Pipeline-run values
 |-- harnesses/
 |   |-- capabilities.py    Detects executable and authenticated Harnesses
 |   |-- cli_common.py      Defines shared CLI turn and result-contract helpers
@@ -30,13 +34,16 @@ src/
 |   |-- instructions.py    Validates and materializes shared instruction snapshots
 |   |-- codex_cli/         Runs Codex, materializes instructions, and captures
 |   |                      JSONL plus local-session observations
-|   `-- copilot_cli/       Runs Copilot, materializes instructions, and captures
+|   |-- copilot_cli/       Runs Copilot, materializes instructions, and captures
 |                          JSONL observations
+|   `-- louie/             Performs API-directed local checkpoint actions
 |-- services/
-|   `-- git/
-|       |-- repository_context.py  Inspects Git state and builds bounded context
-|       |-- file_operations.py     Validates and atomically applies planned writes
-|       `-- policy.py              Parses and evaluates local Git commit policy
+|   `-- checkout/
+|       |-- snapshot.py    Inspects Git state and builds bounded context
+|       |-- operations.py  Validates and atomically applies planned writes
+|       |-- changes.py     Collects checkout diffs and changed files
+|       |-- policy.py      Parses and evaluates local Git commit policy
+|       `-- repository.py  Provides shared checkout operations
 `-- doc/arquitecture.md    Documents runtime module boundaries
 ```
 
@@ -47,12 +54,19 @@ remain directly under `tests`.
 tests/
 |-- clients/
 |   |-- test_pipeline_client.py
-|   `-- test_activity_client.py
+|   |-- test_activity_client.py
+|   `-- test_worker_client.py
 |-- services/
-|   `-- git/
-|       `-- test_repository_context.py
+|   |-- checkout/
+|   |   `-- test_changes.py
+|   |-- test_codex_cli.py
+|   |-- test_copilot_cli.py
+|   |-- test_harness_capabilities.py
+|   `-- test_harness_execution.py
 |-- test_config.py
 |-- test_executor.py
+|-- test_lease_keepalive.py
+|-- test_provisioning.py
 |-- test_runner.py
 `-- test_worker.py
 ```
@@ -68,11 +82,12 @@ invokes `run_forever`.
 Dependency flow is:
 
 ```text
-main -> configuration, capabilities, provisioning, clients, executor, polling
+main -> configuration, capabilities, provisioning, clients, runs, polling
 worker -> ClaimClient, executor callback
-executor -> activity client, pipeline client, services.git
-clients -> HTTP API
-services.git -> configured Git checkout
+runs.executor -> activity client, pipeline client, Harness adapters, checkout services
+harnesses -> Codex or Copilot CLI adapters, API-directed louie actions
+clients -> shared RuntimeApiClient -> HTTP API
+services.checkout -> configured Git checkout
 ```
 
 The worker and executor depend on protocols rather than concrete HTTP clients.
@@ -86,20 +101,27 @@ drift:
 **Composition.** `main.py` remains wiring only; it does not acquire execution
 rules.
 
-**Polling.** `worker.py` remains responsible for project polling and error
-isolation, not checkpoint behavior.
+**Polling.** `polling/worker.py` remains responsible for Project polling,
+heartbeats, and error isolation, not checkpoint behavior.
 
-**Checkpoint orchestration.** `executor.py` remains the orchestration point for
-the local half of the checkpoint protocol.
+**Run orchestration.** `runs/executor.py` remains the orchestration point for
+the local half of the checkpoint protocol, including lease renewal and
+Pipeline continuation.
 
-**Local Git services.** The `services.git` package owns repository context,
-file operations, and commit policy without HTTP or scheduling concerns.
+**Harness routing.** `harnesses/executor.py` routes only frozen `run_harness`
+turns to CLI adapters. The `harnesses/louie` package performs API-directed local
+checkpoint actions.
 
-**HTTP clients.** The `clients` package contains transport adapters and does
-not perform filesystem or Git operations.
+**Local checkout services.** The `services.checkout` package owns repository
+context, file operations, diffs, and commit policy without HTTP or scheduling
+concerns.
 
-**New actions.** New Activity action types require an explicit executor action
-handler and a corresponding API checkpoint contract.
+**HTTP clients.** The `clients` package contains transport adapters over the
+shared `RuntimeApiClient` and does not perform filesystem or Git operations.
+
+**New actions.** New API-directed checkpoint actions require a handler in
+`harnesses/louie` and a corresponding API checkpoint contract. New Harness
+kinds require an adapter in `harnesses`.
 
 **Persistence.** New local persistence requires an ownership decision because
 the API is currently the sole durable execution-state authority.
