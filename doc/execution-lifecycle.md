@@ -1,4 +1,4 @@
-# Pipeline Execution Lifecycle
+# Execution Lifecycle
 
 Looping Louie executes Pipeline work through three cooperating components:
 
