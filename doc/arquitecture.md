@@ -1,9 +1,10 @@
-# Looping Louie Runtime Architecture
+# Looping Louie Runtime Software Architecture
 
 This document describes the software architecture of the Looping Louie Runtime.
-The temporary cross-repository product architecture is documented in
-[`ll-architecture.md`](ll-architecture.md). It defines the shared API/runtime
-ownership boundaries, Worker provisioning, Harness model, and execution flow.
+The cross-repository product architecture is documented on the
+[Looping Louie documentation site](https://loopinglouie.ai/docs/architecture/).
+It defines the shared API/runtime ownership boundaries, Worker provisioning,
+Harness model, and execution flow.
 
 Looping Louie Runtime is a local worker for Pipeline execution. It executes
 API-directed local checkpoints in configured Git checkouts and returns their
