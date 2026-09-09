@@ -128,9 +128,9 @@ the API is currently the sole durable execution-state authority.
 
 ## Related Runtime Documentation
 
-- [Runtime README](../README.md#execution) documents configuration and local
-  checkpoint execution.
+- [Runtime README](../README.md) documents installation, configuration, and
+  worker startup.
 - [Pipeline Execution Lifecycle](lifecycle.md) describes the API/runtime state
-  transition protocol and failure ownership.
-- [Worker Overview](worker-overview.md) documents provisioning, heartbeats,
+  transition protocol, checkpoint execution, and failure ownership.
+- [Workers](workers.md) documents provisioning, heartbeats,
   capabilities, and Pipeline-run leases.
