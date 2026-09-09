@@ -132,5 +132,5 @@ the API is currently the sole durable execution-state authority.
   worker startup.
 - [Pipeline Execution Lifecycle](lifecycle.md) describes the API/runtime state
   transition protocol, checkpoint execution, and failure ownership.
-- [Workers](workers.md) documents provisioning, heartbeats,
-  capabilities, and Pipeline-run leases.
+- [Workers](https://looping-louie.web.app/docs/core-concepts/workers/) documents
+  provisioning, heartbeats, capabilities, and Pipeline-run leases.
