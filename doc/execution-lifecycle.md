@@ -177,13 +177,13 @@ that session's local `turn_context` to observe the effective model and reasoning
 effort. If session metadata is unavailable, `actual_model` falls back to the
 explicit CLI model and `reasoning_effort` remains `null`. Non-zero exits and
 timeouts retain all JSONL observations emitted before failure.
-Every submitted turn identifies the normalized contract as `schema_version=v1`
-and reports the frozen `codex_cli` Harness identity. The API validates that
-identity and publishes the common Harness observation envelope; Codex-specific
-session and materialized-Skill fields remain adapter details. For commit-enabled
-runs, Codex must return a structured final response with a non-empty
-`commit_message`. The runtime submits that proposal to the API and performs Git
-only if the next checkpoint is `commit_if_allowed`.
+Every submitted CLI Harness turn identifies the normalized contract as
+`schema_version=v1` and reports its frozen Harness identity. The API validates
+that identity and publishes the common Harness observation envelope; adapter
+fields remain implementation details. For commit-enabled runs, the CLI Harness
+must return a structured final response with a non-empty `commit_message`. The
+runtime submits that proposal to the API and performs Git only if the next
+checkpoint is `commit_if_allowed`.
 
 ### 1. Queue a Pipeline run
 
