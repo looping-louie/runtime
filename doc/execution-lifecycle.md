@@ -23,7 +23,7 @@ local checkout.
 The API is the control plane and source of truth for:
 
 - Pipeline definitions, Activity definitions, and their immutable run snapshots.
-- Effective model and instruction selection frozen per agent in each Codex
+- Effective model and instruction selection frozen per agent in each CLI Harness
   Activity-run snapshot.
 - Pipeline-run, step, and Activity-run status.
 - Queue ordering, claim leases, continuation tokens, and idempotency records.
@@ -50,15 +50,15 @@ actions in that checkout. Its responsibilities are:
 - Supplying review input from the final local diff.
 - Evaluating local Git policy and committing allowed changes.
 - Reporting the outcome of each local checkpoint to the API.
-- Passing the API-frozen Codex model to the local CLI and reporting the
+- Passing the API-frozen CLI Harness model to the local CLI and reporting the
   requested and actual model observations.
 - Executing the selected writer, proposal, review, or aggregator turn without
   owning the loop's state machine.
 - Identifying each Harness observation with its schema version and frozen
   Harness implementation.
-- Preserving Codex timestamps, duration, session, token usage, exit status,
-  diagnostics, versioned Skills, Git state, diff, files, and final response even
-  when the local process fails.
+- Preserving CLI Harness timestamps, duration, session, token usage, exit
+  status, diagnostics, versioned Skills, Git state, diff, files, and final
+  response even when the local process fails.
 
 The runtime must never choose a checkout from an API response or update a
 Pipeline or Activity status in local storage.
@@ -146,7 +146,7 @@ After a child reaches a terminal state, the runtime advances the Pipeline and
 executes its next scheduled child in the same checkout until the Pipeline is
 terminal. It renews the active Pipeline lease before each checkpoint result and
 before scheduling the next child; a rejected renewal stops execution for that
-claim. While a blocking `codex_cli` turn is running, a background keepalive
+claim. While a blocking CLI Harness turn is running, a background keepalive
 renews the one-minute lease every 30 seconds. A rejected keepalive prevents the
 runtime from submitting that local result. Each checkpoint result also includes
 the claimed Pipeline run and lease token, so the API rejects stale workers
