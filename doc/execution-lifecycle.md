@@ -29,7 +29,7 @@ The API is the control plane and source of truth for:
 - Queue ordering, claim leases, continuation tokens, and idempotency records.
 - Shared direct, refinement, and roundtable turn scheduling and planned file
   operations.
-- Terminal failure reasons and cancellation decisions.
+- Terminal failure reasons.
 
 Only the API persists a transition such as `queued -> claimed`,
 `in_progress -> completed`, or `claimed -> failed`.
