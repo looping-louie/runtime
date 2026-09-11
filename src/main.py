@@ -7,10 +7,12 @@ import argparse
 from clients.activity_client import ActivityRunClient
 from clients.pipeline_client import PipelineRunClaimClient
 from clients.worker_client import WorkerHeartbeatClient
-from config import load_config
-from executor import ActivityExecutor
-from runner import run_forever
-from worker import RuntimeWorker
+from configuration.runtime import load_config
+from harnesses.capabilities import HarnessCapabilityDetector
+from polling.loop import run_forever
+from polling.worker import RuntimeWorker
+from provisioning import provision_missing_workers
+from runs.executor import ActivityExecutor
 
 
 def main() -> None:
@@ -28,13 +30,31 @@ def main() -> None:
     config.validate_checkouts()
     if arguments.check:
         return
-    activity_client = ActivityRunClient(api_base_url=config.api_base_url)
-    pipeline_client = PipelineRunClaimClient(api_base_url=config.api_base_url)
-    worker_client = WorkerHeartbeatClient(api_base_url=config.api_base_url)
+    worker_client = WorkerHeartbeatClient(
+        api_base_url=config.api_base_url,
+        user_id=config.user_id,
+    )
+    capability_detector = HarnessCapabilityDetector()
+    if any(project.worker_id is None for project in config.projects):
+        config = provision_missing_workers(
+            config_path=arguments.config,
+            config=config,
+            client=worker_client,
+            harnesses=capability_detector.current(),
+        )
+    activity_client = ActivityRunClient(
+        api_base_url=config.api_base_url,
+        user_id=config.user_id,
+    )
+    pipeline_client = PipelineRunClaimClient(
+        api_base_url=config.api_base_url,
+        user_id=config.user_id,
+    )
     worker = RuntimeWorker(
         config=config,
         claim_client=pipeline_client,
         heartbeat_client=worker_client,
+        harness_capabilities=capability_detector.current,
         execute_claim=ActivityExecutor(
             activity_client=activity_client,
             pipeline_client=pipeline_client,

@@ -1,10 +1,11 @@
-"""Build bounded repository context for Activity snapshot checkpoints."""
+"""Build bounded repository snapshots for Activity checkpoints."""
 
 from __future__ import annotations
 
-import subprocess
 from collections import Counter
 from pathlib import Path
+
+from .changes import get_changed_files, get_git_diff
 
 
 IGNORED_DIRECTORIES = frozenset({
@@ -18,9 +19,6 @@ SOURCE_EXTENSIONS = frozenset({
 MAX_SNAPSHOT_FILES = 40
 MAX_SNAPSHOT_FILE_CHARS = 8_000
 MAX_SNAPSHOT_TOTAL_CHARS = 220_000
-MAX_REVIEW_FILES = 120
-MAX_REVIEW_FILE_CHARS = 120_000
-MAX_TOTAL_REVIEW_CHARS = 1_200_000
 
 
 def build_repository_context(checkout_path: Path) -> str:
@@ -69,74 +67,6 @@ def build_project_profile(checkout_path: Path) -> dict[str, object]:
     }
 
 
-def get_head_sha(checkout_path: Path) -> str:
-    """Return the configured checkout's current Git commit SHA."""
-
-    return _git(checkout_path, 'rev-parse', 'HEAD')
-
-
-def get_current_branch(checkout_path: Path) -> str:
-    """Return the current non-detached branch for one configured checkout."""
-
-    return _git(checkout_path, 'symbolic-ref', '--quiet', '--short', 'HEAD').strip()
-
-
-def has_changes(checkout_path: Path) -> bool:
-    """Return whether the checkout has staged, unstaged, or untracked changes."""
-
-    return bool(_git(checkout_path, 'status', '--porcelain').strip())
-
-
-def commit_all(checkout_path: Path, message: str) -> str:
-    """Stage and commit every pending checkout change, returning its new SHA."""
-
-    _git(checkout_path, 'add', '--all')
-    _git(checkout_path, 'commit', '-m', message)
-    return get_head_sha(checkout_path)
-
-
-def get_git_diff(checkout_path: Path) -> str:
-    """Return the current checkout diff, including untracked files."""
-
-    tracked_diff = _git(checkout_path, 'diff', '--binary', 'HEAD')
-    untracked_diff = ''.join(
-        _untracked_file_diff(checkout_path, relative_path)
-        for relative_path in _untracked_files(checkout_path)
-    )
-    return f'{tracked_diff}{untracked_diff}'
-
-
-def get_changed_files(checkout_path: Path) -> list[str]:
-    """Return checkout paths changed from HEAD, including untracked files."""
-
-    tracked_files = _git(checkout_path, 'diff', '--name-only', 'HEAD').splitlines()
-    return sorted({*tracked_files, *_untracked_files(checkout_path)})
-
-
-def _untracked_files(checkout_path: Path) -> list[str]:
-    """Return non-ignored untracked paths without altering the Git index."""
-
-    return _git(checkout_path, 'ls-files', '--others', '--exclude-standard').splitlines()
-
-
-def _untracked_file_diff(checkout_path: Path, relative_path: str) -> str:
-    """Return a binary diff for one untracked file without staging it."""
-
-    result = subprocess.run(
-        [
-            'git', '-C', str(checkout_path), 'diff', '--no-index', '--binary',
-            '--', '/dev/null', relative_path,
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode in (0, 1):
-        return result.stdout
-    detail = result.stderr.strip() or result.stdout.strip()
-    raise RuntimeError(f'Git command failed: {detail or "unknown error"}')
-
-
 def load_constitution(checkout_path: Path) -> str:
     """Read a checkout-local constitution or return the runtime default."""
 
@@ -150,47 +80,6 @@ def load_constitution(checkout_path: Path) -> str:
             'Never expose secrets or introduce clear security vulnerabilities.'
         )
     return path.read_text(encoding='utf-8').strip()
-
-
-def read_changed_file_contents(
-    checkout_path: Path,
-    changed_files: list[str],
-) -> dict[str, str]:
-    """Return bounded UTF-8 content for changed files supplied to reviewers."""
-
-    root = checkout_path.resolve()
-    contents: dict[str, str] = {}
-    total_chars = 0
-    for relative_path in changed_files[:MAX_REVIEW_FILES]:
-        path = (root / relative_path).resolve()
-        if not path.is_relative_to(root) or not path.is_file():
-            continue
-        try:
-            content = path.read_text(encoding='utf-8')
-        except (OSError, UnicodeDecodeError):
-            continue
-        if len(content) > MAX_REVIEW_FILE_CHARS:
-            content = f'{content[:MAX_REVIEW_FILE_CHARS]}\n\n[TRUNCATED]'
-        if total_chars + len(content) > MAX_TOTAL_REVIEW_CHARS:
-            break
-        contents[relative_path] = content
-        total_chars += len(content)
-    return contents
-
-
-def _git(checkout_path: Path, *arguments: str) -> str:
-    """Run one Git command and return stdout or raise a contextual error."""
-
-    result = subprocess.run(
-        ['git', '-C', str(checkout_path), *arguments],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode == 0:
-        return result.stdout
-    detail = result.stderr.strip() or result.stdout.strip()
-    raise RuntimeError(f'Git command failed: {detail or "unknown error"}')
 
 
 def _repository_tree(root: Path) -> str:

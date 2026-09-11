@@ -2,29 +2,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 from uuid import uuid4
 
-from services.git.file_operations import apply_file_operations
-from services.git.policy import commit_policy_error, load_git_policy
-from services.git.repository_context import (
-    build_project_profile,
-    build_repository_context,
-    get_changed_files,
-    commit_all,
-    get_current_branch,
-    get_git_diff,
-    get_head_sha,
-    has_changes,
-    load_constitution,
-    read_changed_file_contents,
-)
-from worker import ClaimedPipelineRun
+from harnesses.executor import execute_harness
+from harnesses.louie import execute_louie_action
+from runs.lease_keepalive import LeaseKeepalive
+from runs.models import ClaimedPipelineRun
+from services.checkout.policy import load_git_policy
 
 
 ACTIVITY_RUN_STATUSES = frozenset({'in_progress', 'completed', 'failed', 'stopped'})
 PIPELINE_RUN_STATUSES = frozenset({'queued', 'claimed', 'in_progress', 'failed', 'completed'})
+LEASE_KEEPALIVE_INTERVAL_SECONDS = 30.0
 
 
 class ActivityCheckpointClient(Protocol):
@@ -33,7 +25,7 @@ class ActivityCheckpointClient(Protocol):
     def get_run(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         activity_id: str,
         run_id: str,
     ) -> dict[str, object]:
@@ -42,7 +34,7 @@ class ActivityCheckpointClient(Protocol):
     def continue_run(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         activity_id: str,
         run_id: str,
         pipeline_run_id: str,
@@ -60,7 +52,7 @@ class PipelineContinuationClient(Protocol):
     def continue_run(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         pipeline_id: str,
         run_id: str,
         lease_token: str,
@@ -70,7 +62,7 @@ class PipelineContinuationClient(Protocol):
     def renew_lease(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         pipeline_id: str,
         run_id: str,
         lease_token: str,
@@ -86,11 +78,15 @@ class ActivityExecutor:
         *,
         activity_client: ActivityCheckpointClient,
         pipeline_client: PipelineContinuationClient,
+        harness_runner: Callable[[dict[str, object], Path], dict[str, object]] = execute_harness,
+        lease_keepalive_interval_seconds: float = LEASE_KEEPALIVE_INTERVAL_SECONDS,
     ) -> None:
         """Store the API clients used to complete Activity and Pipeline runs."""
 
         self._activity_client = activity_client
         self._pipeline_client = pipeline_client
+        self._harness_runner = harness_runner
+        self._lease_keepalive_interval_seconds = lease_keepalive_interval_seconds
 
     def execute_claim(self, claim: ClaimedPipelineRun, checkout_path: Path) -> None:
         """Execute the claimed child's supported checkpoint actions to completion."""
@@ -109,7 +105,7 @@ class ActivityExecutor:
             )
             self._renew_lease(claim)
             pipeline_run = self._pipeline_client.continue_run(
-                workspace_id=claim.workspace_id,
+                project_id=claim.project_id,
                 pipeline_id=claim.pipeline_id,
                 run_id=claim.run_id,
                 lease_token=claim.lease_token,
@@ -129,7 +125,7 @@ class ActivityExecutor:
         activity_id = _require_text(child, 'activity_id')
         run_id = _require_text(child, 'id')
         response = self._activity_client.get_run(
-            workspace_id=claim.workspace_id,
+            project_id=claim.project_id,
             activity_id=activity_id,
             run_id=run_id,
         )
@@ -137,7 +133,7 @@ class ActivityExecutor:
         while response.get('status') == 'in_progress':
             self._renew_lease(claim)
             response = self._activity_client.continue_run(
-                workspace_id=claim.workspace_id,
+                project_id=claim.project_id,
                 activity_id=activity_id,
                 run_id=run_id,
                 pipeline_run_id=claim.run_id,
@@ -145,6 +141,7 @@ class ActivityExecutor:
                 continuation_token=_require_text(response, 'continuation_token'),
                 idempotency_key=uuid4().hex,
                 result=self._action_result(
+                    claim=claim,
                     response=response,
                     checkout_path=checkout_path,
                     policy=policy,
@@ -156,15 +153,16 @@ class ActivityExecutor:
         """Keep the current worker lease active before mutating API state."""
 
         self._pipeline_client.renew_lease(
-            workspace_id=claim.workspace_id,
+            project_id=claim.project_id,
             pipeline_id=claim.pipeline_id,
             run_id=claim.run_id,
             lease_token=claim.lease_token,
         )
 
-    @staticmethod
     def _action_result(
+        self,
         *,
+        claim: ClaimedPipelineRun,
         response: dict[str, object],
         checkout_path: Path,
         policy: dict[str, object],
@@ -172,107 +170,17 @@ class ActivityExecutor:
         """Build one supported local checkpoint result for the current Activity state."""
 
         action = _require_text(response, 'next_action')
-        if action == 'collect_snapshot':
-            return {
-                'action': 'collect_snapshot',
-                'repo_context': build_repository_context(checkout_path),
-                'workspace_metadata': {
-                    'workspace_path': str(checkout_path),
-                    'source_commit_sha': get_head_sha(checkout_path),
-                },
-                'constitution': load_constitution(checkout_path),
-                'project_profile': build_project_profile(checkout_path),
-            }
-        if action == 'apply_operations':
-            return _apply_operations_result(response=response, checkout_path=checkout_path)
-        if action == 'submit_review_input':
-            changed_files = get_changed_files(checkout_path)
-            return {
-                'action': 'submit_review_input',
-                'final_diff': get_git_diff(checkout_path),
-                'changed_file_contents': read_changed_file_contents(
-                    checkout_path,
-                    changed_files,
-                ),
-            }
-        if action == 'commit_if_allowed':
-            return _commit_result(
-                response=response,
-                checkout_path=checkout_path,
-                policy=policy,
-            )
-        raise RuntimeError(f'Unsupported runtime activity action: {action!r}.')
-
-
-def _apply_operations_result(
-    *,
-    response: dict[str, object],
-    checkout_path: Path,
-) -> dict[str, object]:
-    """Apply API operations and report the resulting checkout state."""
-
-    payload = response.get('payload')
-    operations = payload.get('operations') if isinstance(payload, dict) else None
-    if not isinstance(operations, list):
-        return {
-            'action': 'apply_operations',
-            'applied': True,
-            'final_diff': get_git_diff(checkout_path),
-            'changed_files': get_changed_files(checkout_path),
-        }
-    try:
-        apply_file_operations(checkout_path, operations)
-    except ValueError as exc:
-        return {'action': 'apply_operations', 'applied': False, 'error': str(exc)}
-    return {
-        'action': 'apply_operations',
-        'applied': True,
-        'final_diff': get_git_diff(checkout_path),
-        'changed_files': get_changed_files(checkout_path),
-    }
-
-
-def _commit_result(
-    *,
-    response: dict[str, object],
-    checkout_path: Path,
-    policy: dict[str, object],
-) -> dict[str, object]:
-    """Commit API-approved changes unless local checkout policy blocks the action."""
-
-    try:
-        policy_error = commit_policy_error(
+        if action == 'run_harness':
+            with LeaseKeepalive(
+                renew=lambda: self._renew_lease(claim),
+                interval_seconds=self._lease_keepalive_interval_seconds,
+            ):
+                return self._harness_runner(response, checkout_path)
+        return execute_louie_action(
+            response=response,
+            checkout_path=checkout_path,
             policy=policy,
-            current_branch=get_current_branch(checkout_path),
         )
-    except RuntimeError as exc:
-        return {'action': 'commit_if_allowed', 'committed': False, 'error': str(exc)}
-    if policy_error is not None:
-        return {'action': 'commit_if_allowed', 'committed': False, 'error': policy_error}
-    payload = response.get('payload')
-    commit_message = payload.get('commit_message') if isinstance(payload, dict) else None
-    if not isinstance(commit_message, str) or not commit_message.strip():
-        return {
-            'action': 'commit_if_allowed',
-            'committed': False,
-            'error': 'Activity run did not provide a commit_message.',
-        }
-    if not has_changes(checkout_path):
-        return {
-            'action': 'commit_if_allowed',
-            'committed': False,
-            'error': 'No repository changes were found to commit.',
-        }
-    try:
-        commit_sha = commit_all(checkout_path, commit_message)
-    except RuntimeError as exc:
-        return {'action': 'commit_if_allowed', 'committed': False, 'error': str(exc)}
-    return {
-        'action': 'commit_if_allowed',
-        'committed': True,
-        'commit_sha': commit_sha,
-        'commit_message': commit_message,
-    }
 
 
 def _require_text(value: dict[str, object], field_name: str) -> str:

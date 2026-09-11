@@ -1,0 +1,1 @@
+"""Trusted local checkout operations for runtime execution."""

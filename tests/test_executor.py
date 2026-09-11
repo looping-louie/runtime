@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from executor import ActivityExecutor
-from worker import ClaimedPipelineRun
+from runs.executor import ActivityExecutor
+from runs.models import ClaimedPipelineRun
 
 
 class FakeActivityClient:
@@ -63,14 +63,14 @@ class FakeActivityClient:
     def get_run(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         activity_id: str,
         run_id: str,
     ) -> dict[str, object]:
         """Return the pending snapshot checkpoint for the claimed child run."""
 
-        assert (workspace_id, activity_id, run_id) == (
-            'workspace-1',
+        assert (project_id, activity_id, run_id) == (
+            'project-1',
             'activity-1',
             'activity-run-1',
         )
@@ -119,7 +119,7 @@ class FakePipelineClient:
     def continue_run(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         pipeline_id: str,
         run_id: str,
         lease_token: str,
@@ -128,7 +128,7 @@ class FakePipelineClient:
 
         self.continuations.append(
             {
-                'workspace_id': workspace_id,
+                'project_id': project_id,
                 'pipeline_id': pipeline_id,
                 'run_id': run_id,
                 'lease_token': lease_token,
@@ -158,7 +158,7 @@ def test_execute_claim_submits_repository_snapshot(tmp_path: Path) -> None:
         pipeline_client=_TerminalPipelineClient(),
     )
     claim = ClaimedPipelineRun(
-        workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
+        project_id='project-1', pipeline_id='pipeline-1', run_id='run-1',
         lease_token='lease-1',
         payload={
             'status': 'claimed',
@@ -175,7 +175,7 @@ def test_execute_claim_submits_repository_snapshot(tmp_path: Path) -> None:
     result = client.continuations[0]['result']
     assert isinstance(result, dict)
     assert result['action'] == 'collect_snapshot'
-    assert result['workspace_metadata']['workspace_path'] == str(checkout)
+    assert result['checkout_metadata']['checkout_path'] == str(checkout)
     assert 'README.md' in result['repo_context']
     assert 'notes.md' in result['repo_context']
     applied_result = client.continuations[1]['result']
@@ -209,7 +209,7 @@ def test_execute_claim_advances_pipeline_through_sequential_children(
         pipeline_client=pipeline_client,
     )
     claim = ClaimedPipelineRun(
-        workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
+        project_id='project-1', pipeline_id='pipeline-1', run_id='run-1',
         lease_token='lease-1',
         payload={
             'status': 'claimed',
@@ -228,13 +228,13 @@ def test_execute_claim_advances_pipeline_through_sequential_children(
     ]
     assert pipeline_client.continuations == [
         {
-            'workspace_id': 'workspace-1',
+            'project_id': 'project-1',
             'pipeline_id': 'pipeline-1',
             'run_id': 'run-1',
             'lease_token': 'lease-1',
         },
         {
-            'workspace_id': 'workspace-1',
+            'project_id': 'project-1',
             'pipeline_id': 'pipeline-1',
             'run_id': 'run-1',
             'lease_token': 'lease-1',
@@ -255,7 +255,7 @@ def test_execute_claim_rejects_invalid_activity_status_before_advancing_pipeline
         pipeline_client=pipeline_client,
     )
     claim = ClaimedPipelineRun(
-        workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
+        project_id='project-1', pipeline_id='pipeline-1', run_id='run-1',
         lease_token='lease-1',
         payload={
             'status': 'claimed',
@@ -284,7 +284,7 @@ def test_execute_claim_rejects_scheduler_response_without_current_child(
         pipeline_client=_MissingCurrentChildPipelineClient(),
     )
     claim = ClaimedPipelineRun(
-        workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
+        project_id='project-1', pipeline_id='pipeline-1', run_id='run-1',
         lease_token='lease-1',
         payload={
             'status': 'claimed',
@@ -321,7 +321,7 @@ def test_execute_claim_uses_the_policy_that_existed_before_operations(
         pipeline_client=_TerminalPipelineClient(),
     )
     claim = ClaimedPipelineRun(
-        workspace_id='workspace-1', pipeline_id='pipeline-1', run_id='run-1',
+        project_id='project-1', pipeline_id='pipeline-1', run_id='run-1',
         lease_token='lease-1',
         payload={
             'status': 'claimed',
@@ -340,6 +340,43 @@ def test_execute_claim_uses_the_policy_that_existed_before_operations(
     assert 'does not include commit' in str(commit_result['error'])
 
 
+def test_execute_claim_submits_harness_result(tmp_path: Path) -> None:
+    """The runtime submits an injected Harness result at a run_harness checkpoint."""
+
+    checkout = tmp_path / 'checkout'
+    checkout.mkdir()
+    activity_client = _HarnessActivityClient()
+    executor = ActivityExecutor(
+        activity_client=activity_client,
+        pipeline_client=_TerminalPipelineClient(),
+        harness_runner=lambda _response, _checkout: {
+            'action': 'run_harness',
+            'completed': True,
+            'final_response': 'Created the requested file.',
+        },
+    )
+    claim = ClaimedPipelineRun(
+        project_id='project-1', pipeline_id='pipeline-1', run_id='run-1',
+        lease_token='lease-1',
+        payload={
+            'status': 'claimed',
+            'current_activity_run': {
+                'id': 'activity-run-1',
+                'activity_id': 'activity-1',
+            },
+        },
+    )
+
+    executor.execute_claim(claim, checkout)
+
+    result = activity_client.continuations[0]['result']
+    assert result == {
+        'action': 'run_harness',
+        'completed': True,
+        'final_response': 'Created the requested file.',
+    }
+
+
 class _CompletedActivityClient:
     """Return an immediately completed state for each scheduled child run."""
 
@@ -351,13 +388,13 @@ class _CompletedActivityClient:
     def get_run(
         self,
         *,
-        workspace_id: str,
+        project_id: str,
         activity_id: str,
         run_id: str,
     ) -> dict[str, object]:
         """Return a completed Activity run for the requested scheduler child."""
 
-        assert workspace_id == 'workspace-1'
+        assert project_id == 'project-1'
         self.requested_runs.append((activity_id, run_id))
         return {
             'id': run_id,
@@ -370,6 +407,34 @@ class _CompletedActivityClient:
         """Reject checkpoint continuation because this test uses terminal children."""
 
         raise AssertionError(f'Unexpected Activity continuation: {payload}')
+
+
+class _HarnessActivityClient:
+    """Expose one Harness checkpoint and then complete the Activity."""
+
+    def __init__(self) -> None:
+        """Initialize the checkpoint submission log."""
+
+        self.continuations: list[dict[str, object]] = []
+
+    def get_run(self, **_payload: str) -> dict[str, object]:
+        """Return the frozen Codex Harness checkpoint response."""
+
+        return {
+            'status': 'in_progress',
+            'next_action': 'run_harness',
+            'continuation_token': 'token-1',
+            'input': 'Create the requested file.',
+            'payload': {
+                'harness': {'kind': 'codex_cli', 'version': 'v1', 'config': {}},
+            },
+        }
+
+    def continue_run(self, **payload: object) -> dict[str, object]:
+        """Record the result and return the terminal Activity state."""
+
+        self.continuations.append(payload)
+        return {'status': 'completed', 'next_action': 'none'}
 
 
 class _InvalidStatusActivityClient:

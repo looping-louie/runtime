@@ -6,7 +6,7 @@ import logging
 
 import pytest
 
-from runner import run_forever
+from polling.loop import run_forever
 
 
 class FakeWorker:
