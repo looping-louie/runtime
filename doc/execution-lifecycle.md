@@ -292,9 +292,10 @@ Runtime continues the Pipeline
 
 ## Failure Ownership
 
-Failure ownership depends on where the failure occurs. The API always persists
-the durable terminal transition, but either the API or the runtime may be the
-component that detects the problem.
+Failure handling depends on where the problem occurs and whether the runtime can
+submit it through the current checkpoint contract. When the API receives and
+accepts a failure outcome, it persists the durable terminal transition. Either
+the API or the runtime may detect the problem.
 
 ### Checkpoint outcomes known to the runtime
 
