@@ -1,47 +1,17 @@
-# Execution Lifecycle
+# Runtime execution lifecycle
 
-Looping Louie executes Pipeline work through three cooperating components:
+This document is the runtime authority for worker provisioning, local checkout
+execution, CLI adapter behavior, and checkpoint reporting. API state,
+configuration snapshots, and checkpoint transitions are owned by the API
+documentation.
 
-- The CLI creates and inspects API resources.
-- The API owns all durable Pipeline and Activity state.
-- The runtime polls for API-assigned work and performs local checkout actions.
+## Local execution ownership
 
-The runtime never mutates durable run status directly. It submits checkpoint
-outcomes under an active lease. The API validates those outcomes and persists
-the resulting Activity and Pipeline transitions.
-
-## Ownership
-
-### CLI
-
-The CLI is an API client. It creates Pipeline runs and provides operators with
-resource-management commands. It does not execute Pipeline steps or select a
-local checkout.
-
-### API
-
-The API is the control plane and source of truth for:
-
-- Pipeline definitions, Activity definitions, and their immutable run snapshots.
-- Effective model and instruction selection frozen per agent in each CLI Harness
-  Activity-run snapshot.
-- Pipeline-run, step, and Activity-run status.
-- Queue ordering, claim leases, continuation tokens, and idempotency records.
-- Shared direct, refinement, and roundtable turn scheduling and planned file
-  operations.
-- Terminal failure reasons.
-
-Only the API persists a transition such as `queued -> claimed`,
-`in_progress -> completed`, or `claimed -> failed`.
-
-### Runtime
-
-The runtime is the local execution plane. It maps an API project identifier
-to a configured clean Git checkout, then performs the API-directed checkpoint
-actions in that checkout. Its responsibilities are:
+The runtime maps an API Project identifier to a configured Git checkout and
+performs API-directed checkpoint actions in that checkout. Its responsibilities
+are:
 
 - Polling configured projects and claiming at most one run per project.
-- Propagating the configured User identity in all API communication.
 - Provisioning each missing worker once with locally detected Harnesses.
 - Re-detecting local Harness health and reporting the current set on heartbeat.
 - Renewing the active Pipeline lease before every state-changing checkpoint.
@@ -60,26 +30,27 @@ actions in that checkout. Its responsibilities are:
   status, diagnostics, versioned Skills, Git state, diff, files, and final
   response even when the local process fails.
 
-The runtime must never choose a checkout from an API response or update a
-Pipeline or Activity status in local storage.
+The runtime uses only its local Project-to-checkout mapping. It never accepts a
+checkout path from an API response or updates Pipeline or Activity status in
+local storage.
 
 ## Worker Provisioning And Polling
 
 For a project mapping without `worker_id`, the runtime checks the configured
 Codex executable and local login, and checks the configured Copilot executable
 with `--version`. It always supports `louie`; it adds `codex_cli` only when both
-Codex checks succeed and adds `copilot_cli` when the Copilot check succeeds. The project is then registered
-through `POST /workers`, and the returned ID is persisted immediately in the
-runtime JSON. Later starts reuse that ID and follow the existing heartbeat and
-polling flow. During polling, a shared detector refreshes at most every 30
-seconds and each project heartbeat replaces the API's observed Harness set.
-Consequently a queued Codex run becomes claimable after a successful local
-login without reprovisioning the worker or recreating the run. The runtime does
-not enumerate CLI models; the API freezes the requested model and the CLI is the
-execution-time authority for whether that authenticated account accepts it. All API requests carry the configured `X-User-ID` and the project-specific
-`X-Project-ID`.
+Codex checks succeed and adds `copilot_cli` when the Copilot check succeeds.
+The project is then registered through `POST /workers`, and the returned ID is
+persisted immediately in the runtime JSON. Later starts reuse that ID and follow
+the existing heartbeat and polling flow. During polling, a shared detector
+refreshes at most every 30 seconds and each project heartbeat replaces the API's
+observed Harness set. Consequently a queued Codex run becomes claimable after a
+successful local login without reprovisioning the worker or recreating the run.
+The runtime does not enumerate CLI models; the API freezes the requested model
+and the CLI determines whether that authenticated account accepts it. All API
+requests carry the configured `X-User-ID` and project-specific `X-Project-ID`.
 
-## Runtime execution lifecycle
+## Local execution sequence
 
 ### 1. Claim runtime-executable work
 
