@@ -79,267 +79,70 @@ not enumerate CLI models; the API freezes the requested model and the CLI is the
 execution-time authority for whether that authenticated account accepts it. All API requests carry the configured `X-User-ID` and the project-specific
 `X-Project-ID`.
 
-## Normal Execution
+## Runtime execution lifecycle
 
-The expected flow is:
+### 1. Claim runtime-executable work
 
-1. CLI creates a Pipeline run in queued.
-2. Runtime claims it. The API gives the worker a one-minute lease token and the
-run becomes claimed.
-3. Runtime collects local context and checkpoints it to the API.
-4. API invokes the configured model to produce the planned operations.
-5. Runtime applies approved operations and commits them.
+The runtime polls each configured Project and claims one compatible Pipeline run
+at a time. The API returns the current Activity child and a lease token. The
+runtime renews that lease before state-changing checkpoints and Pipeline
+continuation; a rejected renewal stops work for that claim.
 
-The following diagram shows the usual single-Activity Pipeline flow.
+Human `approval` and `quiz` Activities do not have a runtime execution path.
+They wait for a person to submit a decision through the API.
 
-```mermaid
-sequenceDiagram
-    participant C as CLI
-    participant A as API
-    participant R as Runtime
-    participant G as Git checkout
+### 2. Collect context and dispatch the selected Harness
 
-    C->>A: Create Pipeline run
-    A-->>C: queued Pipeline run
-    R->>A: Claim next project run
-    A-->>R: claimed run, Activity child, lease token
-    R->>G: Collect repository snapshot
-    R->>A: collect_snapshot checkpoint and lease token
-    A-->>R: apply_operations checkpoint
-    R->>G: Validate and apply operations
-    R->>A: apply_operations outcome and lease token
-    A-->>R: review or commit checkpoint
-    R->>G: Read diff or commit allowed changes
-    R->>A: Checkpoint outcome and lease token
-    A-->>R: terminal Activity state
-    R->>A: Continue Pipeline with lease token
-    A-->>R: next Activity child or terminal Pipeline state
-```
+For a `louie` Activity, the runtime sends bounded repository context through
+`collect_snapshot`. It then handles the API-directed `apply_operations`,
+`submit_review_input`, and `commit_if_allowed` checkpoints. File operations are
+validated and applied atomically without allowing checkout escape or symbolic
+link traversal. Repository context collection is read-only and does not stage
+untracked files or otherwise modify the Git index.
 
-## Runtime Checkpoint Behavior
+For a `codex_cli` or `copilot_cli` Activity, the runtime handles each
+`run_harness` checkpoint by invoking the selected local CLI. It passes the
+API-frozen `requested_model` rather than a local default and constructs the
+turn prompt from the immutable instruction snapshot. Codex materializes Skills
+at `.agents/skills/<name>/SKILL.md`; Copilot materializes them at
+`.github/skills/<name>/SKILL.md`. Temporary Skill directories are removed before
+the checkout diff is collected.
 
-For each Activity child scheduled within a claimed Pipeline run, the runtime
-performs these checkpoint actions in the mapped checkout:
+The runtime reads machine-owned settings: `LOUIE_CODEX_COMMAND` defaults to
+`codex`, `LOUIE_CODEX_SANDBOX` to `workspace-write`,
+`LOUIE_CODEX_TIMEOUT_SECONDS` to `1800`, `LOUIE_COPILOT_COMMAND` to `copilot`,
+and `LOUIE_COPILOT_TIMEOUT_SECONDS` to `1800`. Codex authentication remains
+local to the worker and does not use API Linked Services.
 
-- `collect_snapshot`: sends bounded repository context, project metadata, and
-  the checkout constitution to the API.
-- `apply_operations`: validates and atomically applies API-provided file
-  operations without permitting checkout escape or symbolic-link traversal.
-- `run_harness`: runs one API-selected `codex_cli` or `copilot_cli` v1 agent
-  turn through the corresponding local CLI. Both inject the frozen Persona,
-  pass the API-frozen model, forbid direct Git commits, and report the final
-  phase, agent, iteration, structured output, response, timestamps and duration,
-  models, proposed commit message, process exit, versioned Skills, source and
-  final Git commits, diff, changed files, usage, diagnostics, and session
-  reference to the API. Codex materializes Skills at
-  `.agents/skills/<name>/SKILL.md`; Copilot materializes them at
-  `.github/skills/<name>/SKILL.md`. Temporary Skill directories are removed
-  before the checkout diff is collected.
-- `submit_review_input`: sends the final Git diff and bounded changed-file
-  contents.
-- `commit_if_allowed`: enforces local `louie.yaml` Git policy, then commits an
-  API-approved change when allowed. The runtime captures the policy before
-  planned operations begin, so an operation cannot change the policy that
-  authorizes its own commit.
+### 3. Report outcomes and continue the Pipeline
 
-After a child reaches a terminal state, the runtime advances the Pipeline and
-executes its next scheduled child in the same checkout until the Pipeline is
-terminal. It renews the active Pipeline lease before each checkpoint result and
-before scheduling the next child; a rejected renewal stops execution for that
-claim. While a blocking CLI Harness turn is running, a background keepalive
-renews the one-minute lease every 30 seconds. A rejected keepalive prevents the
-runtime from submitting that local result. Each checkpoint result also includes
-the claimed Pipeline run and lease token, so the API rejects stale workers
-inside the checkpoint transition.
-Malformed Activity responses stop execution for the affected project before
-the runtime can advance Pipeline scheduling. Malformed Pipeline claim or
-scheduler responses stop execution before the runtime can checkpoint a child or
-silently treat a Pipeline as complete.
+Every checkpoint result carries the Pipeline run and lease token. The API
+validates the checkpoint and returns the next requested action or a terminal
+Activity result. A blocking CLI Harness turn runs with a background keepalive
+that renews the lease every 30 seconds; a rejected keepalive prevents the local
+result from being submitted.
 
-The runtime never selects a checkout from an API response. It uses only the
-project-to-checkout mapping in its local configuration. Repository context
-collection is read-only and does not stage untracked files or otherwise modify
-the Git index.
+CLI Harness results use `schema_version=v1` and the frozen Harness identity.
+They include process, timing, model, Git, response, diagnostics, and session
+observations. Codex reads local `turn_context` after a process exits to observe
+the effective model and reasoning effort; when that information is unavailable,
+it falls back to the explicitly requested model. Non-zero exits and timeouts
+retain emitted observations.
 
-For `codex_cli` and `copilot_cli`, the model is selected by the API and supplied
-as `requested_model`; the runtime refuses to use a local model default and
-passes the value to the CLI `--model` option. It reads machine-owned environment
-settings: `LOUIE_CODEX_COMMAND` defaults to `codex`, `LOUIE_CODEX_SANDBOX`
-defaults to `workspace-write`, `LOUIE_CODEX_TIMEOUT_SECONDS` defaults to `1800`
-seconds, `LOUIE_COPILOT_COMMAND` defaults to `copilot`, and
-`LOUIE_COPILOT_TIMEOUT_SECONDS` defaults to `1800` seconds. Persona and Skill
-content comes only from the immutable Activity snapshot supplied by the API;
-the runtime does not fetch mutable instruction resources during execution.
-Codex/OpenAI authentication remains local to the CLI and does not use API
-Linked Services. The public JSONL stream supplies the session reference, token
-usage, response, and diagnostics. After the process exits, the runtime reads
-that session's local `turn_context` to observe the effective model and reasoning
-effort. If session metadata is unavailable, `actual_model` falls back to the
-explicit CLI model and `reasoning_effort` remains `null`. Non-zero exits and
-timeouts retain all JSONL observations emitted before failure.
-Every submitted CLI Harness turn identifies the normalized contract as
-`schema_version=v1` and reports its frozen Harness identity. The API validates
-that identity and publishes the common Harness observation envelope; adapter
-fields remain implementation details. For commit-enabled runs, the CLI Harness
-must return a structured final response with a non-empty `commit_message`. The
-runtime submits that proposal to the API and performs Git only if the next
-checkpoint is `commit_if_allowed`.
+After an Activity reaches a terminal outcome, the runtime asks the API to
+continue the Pipeline. The API schedules the next dependency-ready Activity or
+makes the Pipeline run terminal. The runtime uses only its local
+Project-to-checkout mapping; it never accepts a checkout path from an API
+response.
 
-### 1. Queue a Pipeline run
+### 4. Report represented local failures
 
-The CLI sends a Pipeline run request with the requested work as `input`.
-The API creates a `queued` Pipeline run and captures the configured steps.
+Some local failures have an existing checkpoint outcome and can be reported to
+the API. For example, unsafe planned file operations result in
+`apply_operations` with `applied: false`, and denied, empty, or failed commits
+result in `commit_if_allowed` with `committed: false`. When the API receives and
+accepts one of these outcomes, it persists the resulting terminal transition.
 
-```text
-CLI
-  -> POST /pipelines/{pipeline_id}/runs
-API
-  -> Pipeline run status: queued
-```
-
-### 2. Claim work
-
-The runtime polls each configured project. The API selects one claimable run
-for that project, records a lease token and expiry, and returns the selected
-Activity child.
-
-```text
-Runtime
-  -> POST /pipelines/runs/claim
-API
-  -> Pipeline run status: claimed
-  -> active lease token and expiry
-  -> current Activity run status: in_progress
-```
-
-The lease fences stale workers. Every later runtime checkpoint and Pipeline
-continuation includes the same Pipeline run identifier and lease token.
-
-### 3. Submit checkpoint outcomes
-
-The runtime reads the current Activity run and performs its requested action.
-It submits the result with a continuation token, idempotency key, Pipeline run
-identifier, and lease token. The API validates all of them before changing
-durable state.
-
-```text
-Runtime
-  -> POST /activities/{activity_id}/runs/{run_id}/continue
-API
-  -> validates project, Pipeline lease, continuation token, and idempotency
-  -> persists next Activity state
-  -> returns the next action or a terminal Activity state
-```
-
-### 4. Continue the Pipeline
-
-After an Activity reaches a terminal state, the runtime requests Pipeline
-scheduling continuation. The API records the step outcome, schedules the next
-dependency-ready Activity, skips blocked branches, or makes the Pipeline run
-terminal.
-
-```text
-Runtime
-  -> POST /pipelines/{pipeline_id}/runs/{run_id}/continue
-API
-  -> records terminal child outcome
-  -> returns next Activity child or terminal Pipeline state
-```
-
-## Success Outcomes
-
-The runtime signals success by returning a valid checkpoint result. The API
-then decides and persists the corresponding status transition.
-
-### Snapshot and generation
-
-```text
-Runtime submits collect_snapshot result
-  -> API keeps Activity in_progress
-  -> API generates planned operations
-  -> API returns apply_operations as the next action
-```
-
-### Apply operations
-
-```text
-Runtime applies planned file operations successfully
-  -> runtime sends { action: apply_operations, applied: true, ... }
-  -> API keeps Activity in_progress
-  -> API requests review input or a commit checkpoint
-```
-
-### Review approval
-
-```text
-Runtime submits review input
-  -> API obtains an approving review
-  -> API keeps Activity in_progress
-  -> API returns commit_if_allowed as the next action
-```
-
-### Commit
-
-```text
-Runtime commits allowed changes
-  -> runtime sends { action: commit_if_allowed, committed: true, commit_sha: ... }
-  -> API marks Activity completed
-
-Runtime continues the Pipeline
-  -> API records the step completed
-  -> API schedules a next child or marks the Pipeline completed
-```
-
-## Failure Ownership
-
-Failure handling depends on where the problem occurs and whether the runtime can
-submit it through the current checkpoint contract. When the API receives and
-accepts a failure outcome, it persists the durable terminal transition. Either
-the API or the runtime may detect the problem.
-
-### Checkpoint outcomes known to the runtime
-
-Some local outcomes are already represented by a normal checkpoint result. The
-runtime reports the outcome, and the API marks the Activity failed.
-
-```text
-Runtime cannot safely apply planned file operations
-  -> runtime sends { action: apply_operations, applied: false, error: ... }
-  -> API marks Activity failed
-
-Runtime cannot commit because policy denies it, no changes exist, or Git fails
-  -> runtime sends { action: commit_if_allowed, committed: false, error: ... }
-  -> API marks Activity failed
-```
-
-Once the Activity is terminal, the runtime continues the Pipeline. The API
-records the child step as failed, applies dependency rules, and returns the next
-child or a terminal Pipeline state.
-
-### API-owned execution failures
-
-The API must persist a terminal failure when it detects a non-retryable error
-while processing a valid checkpoint. No additional runtime request is needed.
-
-Examples include:
-
-- A configured model is missing or disabled.
-- A provider or linked service is misconfigured.
-- Model generation returns a failure the API classifies as non-retryable.
-- Activity configuration is invalid during API generation or review.
-- A reviewer rejects the work after all configured retries are exhausted.
-
-The required behavior is:
-
-```text
-Runtime submits a valid checkpoint under an active lease
-  -> API starts API-owned generation, review, or validation work
-  -> API detects a non-retryable failure
-  -> API atomically marks the Activity and Pipeline step failed
-  -> API records a structured failure reason
-  -> API returns the terminal Activity representation or a classified error
-```
-
-If the final Activity step has failed, the API must make the Pipeline run
-advanceable to a terminal failed state. A missing model must not leave the
-Pipeline queued or reclaimable indefinitely.
+Malformed claims, Activity responses, or scheduler responses stop execution for
+the affected Project before the runtime can advance the Pipeline. They are local
+operational failures, not direct runtime status updates.
