@@ -3,15 +3,24 @@
 The runtime is the worker process that claims queued Pipeline runs from the
 Looping Louie API and executes them in configured local Git checkouts.
 
-## Installation
+## Deployment
 
-Install the runtime from this repository:
+## Deploy with docker
+
+For a containerized installation, follow the instructions in
+[Docker](doc/docker.md).
+
+## Deploy manually
+
+### Installation
+
+Clone this repo and install using pip:
 
 ```sh
 pip install .
 ```
 
-## Configuration
+### Configuration
 
 Each worker maps API projects to local repository checkouts. This keeps a
 worker from executing a task in an arbitrary directory supplied by an API run.
@@ -22,15 +31,15 @@ file immediately and reused on later starts.
 
 ```json
 {
-	"api_base_url": "http://127.0.0.1:8000/api/v1",
-	"user_id": "local-user",
-	"poll_interval_seconds": 2,
-	"projects": [
-		{
-			"project_id": "local-project",
-			"repository_path": "/absolute/path/to/checkout"
-		}
-	]
+  "api_base_url": "http://127.0.0.1:8000/api/v1",
+  "user_id": "local-user",
+  "poll_interval_seconds": 2,
+  "projects": [
+    {
+      "project_id": "local-project",
+      "repository_path": "/absolute/path/to/checkout"
+    }
+  ]
 }
 ```
 
