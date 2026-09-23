@@ -67,6 +67,8 @@ printed in console):
 looping-louie-runtime --config runtime.json --check
 ```
 
+### Execution
+
 Start the worker from a normal terminal:
 
 ```sh
@@ -78,16 +80,6 @@ through `POST /api/v1/workers`; the API-generated ID is written back to this
 `runtime.json` configuration file immediately and reused on later starts. Do
 not add `worker_id` yourself.
 
-During initial provisioning, the runtime always advertises `louie`. It also
-advertises `codex_cli` only when the configured `LOUIE_CODEX_COMMAND` passes
-both `--version` and `login status`. The same detection is refreshed while the
-worker runs and the current Harness set is sent with each project heartbeat.
-Installing Codex, logging in, or logging out therefore updates claim admission
-without replacing the persisted `worker_id`; detection is cached for 30
-seconds. It advertises `copilot_cli` when `LOUIE_COPILOT_COMMAND` (defaulting
-to `copilot`) passes `--version`; Copilot authentication is verified when the
-CLI executes the selected turn.
-
 The worker polls every configured project, claims at most one available run
 per project in each cycle, and waits for `poll_interval_seconds` before the
 next cycle. A failed project claim or execution is logged without skipping
@@ -96,3 +88,17 @@ defects stop the worker instead of retrying indefinitely.
 
 Pipeline and Activity checkpoint behavior is documented in
 [Pipeline Execution Lifecycle](doc/lifecycle.md).
+
+### Harness configuration and availability
+
+The runtime detects locally available Harnesses during worker provisioning and
+on subsequent heartbeats. Detection is refreshed every 30 seconds, so changing
+local CLI installation or authentication can affect claim admission without
+replacing the persisted `worker_id`.
+
+- `louie` is always advertised.
+- `codex_cli` is advertised when `LOUIE_CODEX_COMMAND` (default: `codex`)
+  successfully runs both `--version` and `login status`.
+- `copilot_cli` is advertised when `LOUIE_COPILOT_COMMAND` (default:
+  `copilot`) successfully runs `--version`. Copilot authentication is checked
+  only when the runtime executes a Copilot turn.
