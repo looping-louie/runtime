@@ -23,7 +23,7 @@ looping-louie-runtime = 'main:main'
 
 [tool.setuptools]
 package-dir = {'' = 'src'}
-py-modules = ['main']
+py-modules = ['main', 'provisioning']
 
 [tool.setuptools.packages.find]
 where = ['src']
