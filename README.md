@@ -25,12 +25,23 @@ pip install .
 > It is strongly recommended to run the above command in a virtualenv created
 > for this project. All subsequent instructions assume you have created and
 > activated such virtual environment.
+>
+> ```sh
+> python3 -m venv env
+> . env/bin/activate
+> ```
 
 ### Configuration
 
 Before starting the runtime, create `runtime.json` in the directory where you
 will run the commands below. A [template](./assets/config/runtime.json.tpl) for
-this file is available at the assests folder.
+this file is available at the `assets` directory. You can copy it and fill in
+your specific configuration (remove the comments to make it a valid JSON).
+
+```sh
+cp assets/config/runtime.json.tpl runtime.json
+nano runtime.json
+```
 
 A full `runtime.json` configuration file should resemble something like this:
 

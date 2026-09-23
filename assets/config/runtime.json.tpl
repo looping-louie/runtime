@@ -12,7 +12,7 @@
   # Each worker maps API projects to local repository checkouts. This keeps a
   # worker from executing a task in an arbitrary directory supplied by an API
   # run.
-  projects: [
+  "projects": [
     {
       # Replace with the Project ID created in the dashboard or via API
       # Example: "project-id"
