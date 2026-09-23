@@ -63,6 +63,12 @@ def test_execute_copilot_cli_reports_completed_turn(
         '--stream', 'off', '--model', 'gpt-5.6-terra', '--prompt', calls[0][0][-1],
     ]
     assert 'Persona instructions:\nMake the smallest coherent implementation.' in calls[0][0][-1]
+    assert calls[0][0][-1].endswith(
+        'Final response requirement:\nRespond only with this JSON object '
+        'shape, without Markdown fences or additional keys: '
+        '{"final_response": "Concise summary of the completed work.", '
+        '"commit_message": "feat: concise description"}'
+    )
     assert calls[0][1].get('input') is None
     assert not (tmp_path / '.github' / 'skills' / 'api-compatibility').exists()
     assert result == {
@@ -79,3 +85,35 @@ def test_execute_copilot_cli_reports_completed_turn(
         'final_diff': 'diff --git a/a b/a', 'changed_files': ['a.txt'],
         'commit_message': 'feat: complete requested change',
     }
+
+
+def test_execute_copilot_cli_reports_invalid_completion_keys(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A malformed Copilot completion identifies its received keys."""
+
+    def run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        """Return a completion that omits the required final response field."""
+
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            json.dumps({
+                'type': 'assistant.message',
+                'data': {'content': json.dumps({'summary': 'Done.'})},
+            }),
+            '',
+        )
+
+    monkeypatch.setattr(copilot_cli.subprocess, 'run', run)
+
+    result = copilot_cli.execute_copilot_cli(
+        copilot_activity('Inspect the project.', commit_mode='forbid'),
+        tmp_path,
+    )
+
+    assert result['completed'] is False
+    assert result['error'] == (
+        'Copilot final response has invalid keys; expected final_response; '
+        'received summary.'
+    )
