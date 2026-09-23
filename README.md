@@ -20,23 +20,28 @@ Clone this repo and install using pip:
 pip install .
 ```
 
+> [!CAUTION]
+>
+> It is strongly recommended to run the above command in a virtualenv created
+> for this project. All subsequent instructions assume you have created and
+> activated such virtual environment.
+
 ### Configuration
 
-Each worker maps API projects to local repository checkouts. This keeps a
-worker from executing a task in an arbitrary directory supplied by an API run.
-The top-level `user_id` is propagated as `X-User-ID` on every API request.
-On the first normal start, each project without a `worker_id` is provisioned
-through `POST /api/v1/workers`; the API-generated ID is written back to this
-file immediately and reused on later starts.
+Before starting the runtime, create `runtime.json` in the directory where you
+will run the commands below. A [template](./assets/config/runtime.json.tpl) for
+this file is available at the assests folder.
+
+A full `runtime.json` configuration file should resemble something like this:
 
 ```json
 {
-  "api_base_url": "http://127.0.0.1:8000/api/v1",
+  "api_base_url": "http://127.0.0.1:2000/api/v1",
   "user_id": "local-user",
   "poll_interval_seconds": 2,
   "projects": [
     {
-      "project_id": "local-project",
+      "project_id": "project-id",
       "repository_path": "/absolute/path/to/checkout"
     }
   ]
@@ -44,7 +49,8 @@ file immediately and reused on later starts.
 ```
 
 Validate configuration, Git checkout ownership, and a clean worktree before
-starting a worker:
+starting a worker (a silent response means success, any error will be otherwise
+printed in console):
 
 ```sh
 looping-louie-runtime --config runtime.json --check
@@ -55,6 +61,11 @@ Start the worker from a normal terminal:
 ```sh
 looping-louie-runtime --config runtime.json
 ```
+
+On the first normal start, each project without a `worker_id` is provisioned
+through `POST /api/v1/workers`; the API-generated ID is written back to this
+`runtime.json` configuration file immediately and reused on later starts. Do
+not add `worker_id` yourself.
 
 During initial provisioning, the runtime always advertises `louie`. It also
 advertises `codex_cli` only when the configured `LOUIE_CODEX_COMMAND` passes
