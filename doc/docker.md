@@ -20,8 +20,8 @@ docker build \
 
 Installing an executable does not authenticate it. Declare only the Harnesses
 that are configured and authenticated for this container in `runtime.json`.
-For example, keep `harnesses` as `['louie']` until Codex and Copilot
-authentication are available, then add `codex_cli` or `copilot_cli`.
+For example, use `['codex_cli']` only after Codex authentication is available.
+Use `[]` for a connected worker that must not receive Harness work.
 
 ## Start the runtime
 

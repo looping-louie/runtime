@@ -77,10 +77,8 @@ def test_load_config_requires_user_identity(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ('harnesses', 'message'),
     (
-        (None, 'non-empty array'),
-        ([], 'non-empty array'),
+        (None, 'must be an array'),
         (['louie', 'louie'], 'must not contain duplicates'),
-        (['codex_cli'], 'must include louie'),
         (['louie', 'unknown'], 'unsupported Harness'),
     ),
 )
@@ -96,6 +94,24 @@ def test_load_config_rejects_invalid_harness_declaration(
 
     with pytest.raises(ValueError, match=message):
         load_config(write_config(tmp_path, payload))
+
+
+def test_load_config_accepts_a_cli_only_harness_declaration(tmp_path: Path) -> None:
+    """Every supported Harness can be declared without Louie."""
+
+    payload = config_payload()
+    payload['harnesses'] = ['codex_cli']
+
+    assert load_config(write_config(tmp_path, payload)).harnesses == ('codex_cli',)
+
+
+def test_load_config_accepts_an_empty_harness_declaration(tmp_path: Path) -> None:
+    """A runtime can remain connected while declaring no executable Harnesses."""
+
+    payload = config_payload()
+    payload['harnesses'] = []
+
+    assert load_config(write_config(tmp_path, payload)).harnesses == ()
 
 
 def test_validate_checkouts_requires_git_repository(tmp_path: Path) -> None:

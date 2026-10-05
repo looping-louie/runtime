@@ -93,8 +93,9 @@ Pipeline and Activity checkpoint behavior is documented in
 ### Harness configuration and availability
 
 The required `harnesses` list in `runtime.json` declares every Harness the
-runtime is allowed to execute and publish to the API. It must include `louie`.
-The supported CLI Harnesses are `codex_cli` and `copilot_cli`.
+runtime is allowed to execute and publish to the API. Supported values are
+`louie`, `codex_cli`, and `copilot_cli`; an empty list keeps the worker
+connected but unable to claim Harness work.
 
 Startup and `--check` validate every declared CLI Harness:
 

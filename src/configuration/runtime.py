@@ -138,8 +138,8 @@ def _parse_harnesses(value: object) -> tuple[str, ...]:
     """Validate the Harnesses this runtime is configured to execute."""
 
     supported_harnesses = frozenset({'louie', 'codex_cli', 'copilot_cli'})
-    if not isinstance(value, list) or not value:
-        raise ValueError('harnesses must be a non-empty array.')
+    if not isinstance(value, list):
+        raise ValueError('harnesses must be an array.')
     if not all(
         isinstance(harness, str) and harness in supported_harnesses
         for harness in value
@@ -147,8 +147,6 @@ def _parse_harnesses(value: object) -> tuple[str, ...]:
         raise ValueError('harnesses contains an unsupported Harness.')
     if len(set(value)) != len(value):
         raise ValueError('harnesses must not contain duplicates.')
-    if 'louie' not in value:
-        raise ValueError('harnesses must include louie.')
     return tuple(value)
 
 
