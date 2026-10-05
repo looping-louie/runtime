@@ -15,8 +15,8 @@ def validate_harness_capabilities(
     """Require every configured Harness executable to be locally ready."""
 
     checks = {
-        'codex_cli': [_command('LOUIE_CODEX_COMMAND', 'codex'), 'login', 'status'],
-        'copilot_cli': [_command('LOUIE_COPILOT_COMMAND', 'copilot'), '--version'],
+        'codex_cli': [_command('LOUIE_CODEX_BINARY', 'codex'), 'login', 'status'],
+        'copilot_cli': [_command('LOUIE_COPILOT_BINARY', 'copilot'), '--version'],
     }
     for harness in harnesses:
         command = checks.get(harness)

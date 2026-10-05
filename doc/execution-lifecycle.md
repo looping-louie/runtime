@@ -79,9 +79,9 @@ at `.agents/skills/<name>/SKILL.md`; Copilot materializes them at
 `.github/skills/<name>/SKILL.md`. Temporary Skill directories are removed before
 the checkout diff is collected.
 
-The runtime reads machine-owned settings: `LOUIE_CODEX_COMMAND` defaults to
+The runtime reads machine-owned settings: `LOUIE_CODEX_BINARY` defaults to
 `codex`, `LOUIE_CODEX_SANDBOX` to `workspace-write`,
-`LOUIE_CODEX_TIMEOUT_SECONDS` to `1800`, `LOUIE_COPILOT_COMMAND` to `copilot`,
+`LOUIE_CODEX_TIMEOUT_SECONDS` to `1800`, `LOUIE_COPILOT_BINARY` to `copilot`,
 and `LOUIE_COPILOT_TIMEOUT_SECONDS` to `1800`. Codex authentication remains
 local to the worker and does not use API Linked Services.
 

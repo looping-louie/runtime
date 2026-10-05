@@ -25,6 +25,26 @@ def test_validate_harnesses_accepts_authenticated_codex() -> None:
     assert calls == [['codex', 'login', 'status']]
 
 
+def test_validate_harnesses_uses_configured_codex_binary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Codex preflight honors the executable-location override."""
+
+    calls: list[list[str]] = []
+
+    def run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        """Record successful Codex preflight commands."""
+
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, '', '')
+
+    monkeypatch.setenv('LOUIE_CODEX_BINARY', '/opt/bin/codex')
+
+    validate_harness_capabilities(('codex_cli',), run=run)
+
+    assert calls == [['/opt/bin/codex', 'login', 'status']]
+
+
 def test_validate_harnesses_accepts_available_copilot() -> None:
     """Configured Copilot requires a successful executable preflight."""
 

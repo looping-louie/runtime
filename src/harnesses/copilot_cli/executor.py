@@ -43,9 +43,9 @@ def execute_copilot_cli(
         payload = _require_payload(response)
         _require_copilot_harness(payload)
         requested_model = _require_requested_model(payload)
-        command = os.environ.get('LOUIE_COPILOT_COMMAND', 'copilot').strip()
+        command = os.environ.get('LOUIE_COPILOT_BINARY', 'copilot').strip()
         if not command:
-            raise ValueError('LOUIE_COPILOT_COMMAND must not be empty.')
+            raise ValueError('LOUIE_COPILOT_BINARY must not be empty.')
         snapshot = _require_instruction_snapshot(payload)
         turn = _turn(payload)
         phase = str(turn.get('phase', 'execute'))

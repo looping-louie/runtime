@@ -99,9 +99,9 @@ connected but unable to claim Harness work.
 
 Startup and `--check` validate every declared CLI Harness:
 
-- `codex_cli` requires `LOUIE_CODEX_COMMAND` (default: `codex`) to pass
+- `codex_cli` requires `LOUIE_CODEX_BINARY` (default: `codex`) to pass
 `login status`.
-- `copilot_cli` requires `LOUIE_COPILOT_COMMAND` (default: `copilot`) to
+- `copilot_cli` requires `LOUIE_COPILOT_BINARY` (default: `copilot`) to
 pass `--version`.
 
 These environment variables are optional executable-location overrides; they do

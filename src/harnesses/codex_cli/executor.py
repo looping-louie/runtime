@@ -41,9 +41,9 @@ def execute_codex_cli(response: Mapping[str, object], checkout_path: Path) -> di
         payload = _require_payload(response)
         _require_codex_harness(payload)
         requested_model = _require_requested_model(payload)
-        command = os.environ.get('LOUIE_CODEX_COMMAND', 'codex').strip()
+        command = os.environ.get('LOUIE_CODEX_BINARY', 'codex').strip()
         if not command:
-            raise ValueError('LOUIE_CODEX_COMMAND must not be empty.')
+            raise ValueError('LOUIE_CODEX_BINARY must not be empty.')
         snapshot = _require_instruction_snapshot(payload)
         turn = _turn(payload)
         phase = str(turn.get('phase', 'execute'))
