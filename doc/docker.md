@@ -8,6 +8,21 @@ Build the image from the repository root:
 docker build -t looping-louie-runtime:latest .
 ```
 
+The image includes the `codex` and `copilot` executables. Their pinned package
+versions can be replaced at build time:
+
+```sh
+docker build \
+  --build-arg CODEX_CLI_VERSION=0.160.0 \
+  --build-arg COPILOT_CLI_VERSION=1.0.91 \
+  -t looping-louie-runtime:latest .
+```
+
+Installing an executable does not authenticate it. Declare only the Harnesses
+that are configured and authenticated for this container in `runtime.json`.
+For example, keep `harnesses` as `['louie']` until Codex and Copilot
+authentication are available, then add `codex_cli` or `copilot_cli`.
+
 ## Start the runtime
 
 The runtime needs writable access to its configuration directory and each Git

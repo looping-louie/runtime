@@ -96,8 +96,16 @@ The required `harnesses` list in `runtime.json` declares every Harness the
 runtime is allowed to execute and publish to the API. It must include `louie`.
 The supported CLI Harnesses are `codex_cli` and `copilot_cli`.
 
-Startup and `--check` validate every declared CLI Harness. `codex_cli` requires
-`LOUIE_CODEX_COMMAND` (default: `codex`) to pass `login status`. `copilot_cli`
-requires `LOUIE_COPILOT_COMMAND` (default: `copilot`) to pass `--version`.
+Startup and `--check` validate every declared CLI Harness:
+
+- `codex_cli` requires `LOUIE_CODEX_COMMAND` (default: `codex`) to pass
+`login status`.
+- `copilot_cli` requires `LOUIE_COPILOT_COMMAND` (default: `copilot`) to
+pass `--version`.
+
 These environment variables are optional executable-location overrides; they do
 not enable a Harness that is absent from `harnesses`.
+
+The Docker image includes both CLI executables. Installing an executable does
+not authenticate it; configure authentication before declaring its Harness in
+`runtime.json`.
