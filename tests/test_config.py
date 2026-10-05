@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from configuration.runtime import load_config, persist_worker_id
+from configuration.runtime import HarnessConfig, load_config, persist_worker_id
 
 
 def write_config(tmp_path: Path, payload: dict[str, object]) -> Path:
@@ -26,7 +26,7 @@ def config_payload(checkout_path: Path | str = '/checkout') -> dict[str, object]
         'api_base_url': 'http://127.0.0.1:8000/api/v1',
         'user_id': 'user-local',
         'poll_interval_seconds': 2,
-        'harnesses': ['louie'],
+        'harnesses': [{'kind': 'louie'}],
         'projects': [{
             'project_id': 'project-local',
             'worker_id': 'worker-1',
@@ -41,12 +41,17 @@ def test_load_config_resolves_workspace_checkout(tmp_path: Path) -> None:
     checkout_path = tmp_path / 'checkout'
     checkout_path.mkdir()
     payload = config_payload(checkout_path)
-    payload['harnesses'] = ['louie', 'codex_cli']
+    payload['harnesses'] = [{'kind': 'louie'}, {'kind': 'codex_cli'}]
     config = load_config(write_config(tmp_path, payload))
 
     assert config.api_base_url == 'http://127.0.0.1:8000/api/v1'
     assert config.user_id == 'user-local'
-    assert config.harnesses == ('louie', 'codex_cli')
+    assert config.harnesses == (
+        HarnessConfig(kind='louie'),
+        HarnessConfig(kind='codex_cli', binary='codex'),
+    )
+    assert config.harness_kinds == ('louie', 'codex_cli')
+    assert config.harness_binaries == {'codex_cli': 'codex'}
     assert config.checkout_for('project-local').repository_path == checkout_path
     assert config.checkout_for('project-local').worker_id == 'worker-1'
 
@@ -78,8 +83,8 @@ def test_load_config_requires_user_identity(tmp_path: Path) -> None:
     ('harnesses', 'message'),
     (
         (None, 'must be an array'),
-        (['louie', 'louie'], 'must not contain duplicates'),
-        (['louie', 'unknown'], 'unsupported Harness'),
+        ([{'kind': 'louie'}, {'kind': 'louie'}], 'must not contain duplicates'),
+        ([{'kind': 'louie'}, {'kind': 'unknown'}], 'unsupported Harness'),
     ),
 )
 def test_load_config_rejects_invalid_harness_declaration(
@@ -100,9 +105,14 @@ def test_load_config_accepts_a_cli_only_harness_declaration(tmp_path: Path) -> N
     """Every supported Harness can be declared without Louie."""
 
     payload = config_payload()
-    payload['harnesses'] = ['codex_cli']
+    payload['harnesses'] = [{'kind': 'codex_cli', 'binary': '/opt/bin/codex'}]
 
-    assert load_config(write_config(tmp_path, payload)).harnesses == ('codex_cli',)
+    config = load_config(write_config(tmp_path, payload))
+
+    assert config.harnesses == (
+        HarnessConfig(kind='codex_cli', binary='/opt/bin/codex'),
+    )
+    assert config.harness_binaries == {'codex_cli': '/opt/bin/codex'}
 
 
 def test_load_config_accepts_an_empty_harness_declaration(tmp_path: Path) -> None:

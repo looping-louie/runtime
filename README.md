@@ -50,7 +50,9 @@ A full `runtime.json` configuration file should resemble something like this:
   "api_base_url": "http://127.0.0.1:2000/api/v1",
   "user_id": "local-user",
   "poll_interval_seconds": 2,
-  "harnesses": ["louie"],
+  "harnesses": [
+    { "kind": "louie" }
+  ],
   "projects": [
     {
       "project_id": "project-id",
@@ -93,19 +95,18 @@ Pipeline and Activity checkpoint behavior is documented in
 ### Harness configuration and availability
 
 The required `harnesses` list in `runtime.json` declares every Harness the
-runtime is allowed to execute and publish to the API. Supported values are
-`louie`, `codex_cli`, and `copilot_cli`; an empty list keeps the worker
-connected but unable to claim Harness work.
+runtime is allowed to execute and publish to the API. Each declaration has a
+required `kind`: `louie`, `codex_cli`, or `copilot_cli`. An empty list keeps
+the worker connected but unable to claim Harness work. The
+[configuration template](assets/config/runtime.json.tpl) documents every
+available field.
 
 Startup and `--check` validate every declared CLI Harness:
 
-- `codex_cli` requires `LOUIE_CODEX_BINARY` (default: `codex`) to pass
-`login status`.
-- `copilot_cli` requires `LOUIE_COPILOT_BINARY` (default: `copilot`) to
-pass `--version`.
-
-These environment variables are optional executable-location overrides; they do
-not enable a Harness that is absent from `harnesses`.
+- `codex_cli` uses its optional `binary` field (default: `codex`) to pass
+  `login status`.
+- `copilot_cli` uses its optional `binary` field (default: `copilot`) to pass
+  `--version`.
 
 The Docker image includes both CLI executables. Installing an executable does
 not authenticate it; configure authentication before declaring its Harness in

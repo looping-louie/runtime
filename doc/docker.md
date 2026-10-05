@@ -50,7 +50,9 @@ mapping whose `repository_path` is `/workspaces/project`:
   "api_base_url": "http://host.docker.internal:2000/api/v1",
   "user_id": "local-user",
   "poll_interval_seconds": 2,
-  "harnesses": ["louie"],
+  "harnesses": [
+    { "kind": "louie" }
+  ],
   "projects": [
     {
       "project_id": "local-project",

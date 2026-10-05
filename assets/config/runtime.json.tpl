@@ -9,11 +9,16 @@
   # the time (in seconds) between two consecutive requests to the API
   # Example: 2
   "poll_interval_seconds": ,
-  # Harnesses this runtime is allowed to execute. Declare only Harnesses
-  # installed and authenticated on this machine. An empty list receives no work.
-  # Supported values: "louie", "codex_cli", "copilot_cli"
-  # Example: ["codex_cli"]
-  "harnesses": ["louie"],
+  # Harnesses this runtime is allowed to execute. Each entry has a required
+  # kind. CLI Harnesses may set binary to an executable path; it defaults to
+  # "codex" or "copilot". Delete unavailable entries. An empty list receives
+  # no work.
+  # Supported kinds: "louie", "codex_cli", "copilot_cli"
+  "harnesses": [
+    { "kind": "louie" },
+    { "kind": "codex_cli", "binary": "codex" },
+    { "kind": "copilot_cli", "binary": "copilot" }
+  ],
   # Each worker maps API projects to local repository checkouts. This keeps a
   # worker from executing a task in an arbitrary directory supplied by an API
   # run.

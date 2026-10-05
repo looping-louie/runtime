@@ -23,7 +23,12 @@ from .instructions import materialize_instruction_snapshot
 from .observations import enrich_with_session_settings, parse_codex_events
 
 
-def execute_codex_cli(response: Mapping[str, object], checkout_path: Path) -> dict[str, object]:
+def execute_codex_cli(
+    response: Mapping[str, object],
+    checkout_path: Path,
+    *,
+    binary: str = 'codex',
+) -> dict[str, object]:
     """Run Codex in the mapped checkout and return the checkpoint result."""
 
     started_at = _utc_now()
@@ -41,9 +46,6 @@ def execute_codex_cli(response: Mapping[str, object], checkout_path: Path) -> di
         payload = _require_payload(response)
         _require_codex_harness(payload)
         requested_model = _require_requested_model(payload)
-        command = os.environ.get('LOUIE_CODEX_BINARY', 'codex').strip()
-        if not command:
-            raise ValueError('LOUIE_CODEX_BINARY must not be empty.')
         snapshot = _require_instruction_snapshot(payload)
         turn = _turn(payload)
         phase = str(turn.get('phase', 'execute'))
@@ -56,7 +58,7 @@ def execute_codex_cli(response: Mapping[str, object], checkout_path: Path) -> di
             materialized_skills = instructions.materialized_skills
             result = subprocess.run(
                 [
-                    command,
+                    binary,
                     'exec',
                     '--json',
                     '--model',

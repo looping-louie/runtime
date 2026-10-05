@@ -2,35 +2,35 @@
 
 from __future__ import annotations
 
-import os
 import subprocess
 from typing import Callable
 
+from configuration.runtime import HarnessConfig
+
 
 def validate_harness_capabilities(
-    harnesses: tuple[str, ...],
+    harnesses: tuple[HarnessConfig, ...],
     *,
     run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
 ) -> None:
     """Require every configured Harness executable to be locally ready."""
 
     checks = {
-        'codex_cli': [_command('LOUIE_CODEX_BINARY', 'codex'), 'login', 'status'],
-        'copilot_cli': [_command('LOUIE_COPILOT_BINARY', 'copilot'), '--version'],
+        'codex_cli': ['login', 'status'],
+        'copilot_cli': ['--version'],
     }
     for harness in harnesses:
-        command = checks.get(harness)
-        if command is not None and not _command_succeeds(command, run=run):
+        arguments = checks.get(harness.kind)
+        if arguments is None:
+            continue
+        if harness.binary is None:
+            raise RuntimeError(f'Configured Harness {harness.kind!r} has no binary.')
+        command = [harness.binary, *arguments]
+        if not _command_succeeds(command, run=run):
             raise RuntimeError(
-                f"Configured Harness {harness!r} is unavailable: "
+                f"Configured Harness {harness.kind!r} is unavailable: "
                 f"{' '.join(command)!r} did not succeed."
             )
-
-
-def _command(variable: str, default: str) -> str:
-    """Return the configured Harness command or an empty invalid command."""
-
-    return os.environ.get(variable, default).strip()
 
 
 def _command_succeeds(

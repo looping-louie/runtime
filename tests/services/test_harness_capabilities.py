@@ -7,6 +7,7 @@ import subprocess
 import pytest
 
 from harnesses.capabilities import validate_harness_capabilities
+from configuration.runtime import HarnessConfig
 
 
 def test_validate_harnesses_accepts_authenticated_codex() -> None:
@@ -20,14 +21,15 @@ def test_validate_harnesses_accepts_authenticated_codex() -> None:
         calls.append(command)
         return subprocess.CompletedProcess(command, 0, '', '')
 
-    validate_harness_capabilities(('louie', 'codex_cli'), run=run)
+    validate_harness_capabilities((
+        HarnessConfig(kind='louie'),
+        HarnessConfig(kind='codex_cli', binary='codex'),
+    ), run=run)
 
     assert calls == [['codex', 'login', 'status']]
 
 
-def test_validate_harnesses_uses_configured_codex_binary(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_validate_harnesses_uses_configured_codex_binary() -> None:
     """Codex preflight honors the executable-location override."""
 
     calls: list[list[str]] = []
@@ -38,9 +40,9 @@ def test_validate_harnesses_uses_configured_codex_binary(
         calls.append(command)
         return subprocess.CompletedProcess(command, 0, '', '')
 
-    monkeypatch.setenv('LOUIE_CODEX_BINARY', '/opt/bin/codex')
-
-    validate_harness_capabilities(('codex_cli',), run=run)
+    validate_harness_capabilities((
+        HarnessConfig(kind='codex_cli', binary='/opt/bin/codex'),
+    ), run=run)
 
     assert calls == [['/opt/bin/codex', 'login', 'status']]
 
@@ -56,7 +58,10 @@ def test_validate_harnesses_accepts_available_copilot() -> None:
         calls.append(command)
         return subprocess.CompletedProcess(command, 0, '', '')
 
-    validate_harness_capabilities(('louie', 'copilot_cli'), run=run)
+    validate_harness_capabilities((
+        HarnessConfig(kind='louie'),
+        HarnessConfig(kind='copilot_cli', binary='copilot'),
+    ), run=run)
 
     assert calls == [['copilot', '--version']]
 
@@ -70,7 +75,10 @@ def test_validate_harnesses_rejects_unauthenticated_codex() -> None:
         return subprocess.CompletedProcess(command, 1, '', '')
 
     with pytest.raises(RuntimeError, match='codex_cli'):
-        validate_harness_capabilities(('louie', 'codex_cli'), run=run)
+        validate_harness_capabilities((
+            HarnessConfig(kind='louie'),
+            HarnessConfig(kind='codex_cli', binary='codex'),
+        ), run=run)
 
 
 def test_validate_harnesses_rejects_missing_codex() -> None:
@@ -82,4 +90,7 @@ def test_validate_harnesses_rejects_missing_codex() -> None:
         raise FileNotFoundError(command[0])
 
     with pytest.raises(RuntimeError, match='codex_cli'):
-        validate_harness_capabilities(('louie', 'codex_cli'), run=run)
+        validate_harness_capabilities((
+            HarnessConfig(kind='louie'),
+            HarnessConfig(kind='codex_cli', binary='codex'),
+        ), run=run)

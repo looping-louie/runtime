@@ -68,7 +68,10 @@ def _write_config(tmp_path: Path, *, worker_id: str | None) -> Path:
             'api_base_url': 'https://api.example/api/v1',
             'user_id': 'user-1',
             'poll_interval_seconds': 2,
-            'harnesses': ['louie', 'codex_cli'],
+            'harnesses': [
+                {'kind': 'louie'},
+                {'kind': 'codex_cli'},
+            ],
             'projects': [project],
         }),
         encoding='utf-8',

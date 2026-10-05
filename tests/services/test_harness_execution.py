@@ -21,15 +21,19 @@ def test_execute_harness_routes_codex_v1(
     monkeypatch.setitem(
         executor.HARNESS_ADAPTERS,
         ('codex_cli', 'v1'),
-        lambda received, checkout: {
+        lambda received, checkout, *, binary: {
             'received': received,
             'checkout': str(checkout),
+            'binary': binary,
         },
     )
 
-    assert executor.execute_harness(response, tmp_path) == {
+    assert executor.execute_harness(
+        response, tmp_path, binaries={'codex_cli': '/opt/bin/codex'},
+    ) == {
         'received': response,
         'checkout': str(tmp_path),
+        'binary': '/opt/bin/codex',
     }
 
 
@@ -47,12 +51,17 @@ def test_execute_harness_routes_copilot_v1(
     monkeypatch.setitem(
         executor.HARNESS_ADAPTERS,
         ('copilot_cli', 'v1'),
-        lambda received, checkout: {'received': received, 'checkout': str(checkout)},
+        lambda received, checkout, *, binary: {
+            'received': received, 'checkout': str(checkout), 'binary': binary,
+        },
     )
 
-    assert executor.execute_harness(response, tmp_path) == {
+    assert executor.execute_harness(
+        response, tmp_path, binaries={'copilot_cli': '/opt/bin/copilot'},
+    ) == {
         'received': response,
         'checkout': str(tmp_path),
+        'binary': '/opt/bin/copilot',
     }
 
 
@@ -64,4 +73,4 @@ def test_execute_harness_rejects_an_unknown_adapter(tmp_path: Path) -> None:
             'payload': {
                 'harness': {'kind': 'future_cli', 'version': 'v1', 'config': {}},
             },
-        }, tmp_path)
+        }, tmp_path, binaries={})

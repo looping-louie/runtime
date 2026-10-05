@@ -32,14 +32,38 @@ class ProjectCheckout:
 
 
 @dataclass(frozen=True, slots=True)
+class HarnessConfig:
+    """One Harness the runtime may publish and execute locally."""
+
+    kind: str
+    binary: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class RuntimeConfig:
     """Runtime connection settings and authorized project checkouts."""
 
     api_base_url: str
     user_id: str
     poll_interval_seconds: float
-    harnesses: tuple[str, ...]
+    harnesses: tuple[HarnessConfig, ...]
     projects: tuple[ProjectCheckout, ...]
+
+    @property
+    def harness_kinds(self) -> tuple[str, ...]:
+        """Return the declared Harness identifiers for API capability reports."""
+
+        return tuple(harness.kind for harness in self.harnesses)
+
+    @property
+    def harness_binaries(self) -> dict[str, str]:
+        """Return configured CLI executable locations keyed by Harness kind."""
+
+        return {
+            harness.kind: harness.binary
+            for harness in self.harnesses
+            if harness.binary is not None
+        }
 
     def checkout_for(self, project_id: str) -> ProjectCheckout:
         """Return the configured checkout for one API project."""
@@ -134,20 +158,38 @@ def _parse_projects(value: object) -> tuple[ProjectCheckout, ...]:
     return tuple(projects)
 
 
-def _parse_harnesses(value: object) -> tuple[str, ...]:
+def _parse_harnesses(value: object) -> tuple[HarnessConfig, ...]:
     """Validate the Harnesses this runtime is configured to execute."""
 
-    supported_harnesses = frozenset({'louie', 'codex_cli', 'copilot_cli'})
+    default_binaries = {
+        'codex_cli': 'codex',
+        'copilot_cli': 'copilot',
+    }
+    supported_harnesses = frozenset({'louie', *default_binaries})
     if not isinstance(value, list):
         raise ValueError('harnesses must be an array.')
-    if not all(
-        isinstance(harness, str) and harness in supported_harnesses
-        for harness in value
-    ):
-        raise ValueError('harnesses contains an unsupported Harness.')
-    if len(set(value)) != len(value):
+    harnesses: list[HarnessConfig] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise ValueError(f'harnesses[{index}] must be an object.')
+        _reject_unknown_fields(item, {'kind', 'binary'}, f'harnesses[{index}]')
+        kind = _require_text(item.get('kind'), f'harnesses[{index}].kind')
+        if kind not in supported_harnesses:
+            raise ValueError('harnesses contains an unsupported Harness.')
+        binary = item.get('binary')
+        if kind == 'louie' and binary is not None:
+            raise ValueError('harnesses louie configuration must not include binary.')
+        harnesses.append(HarnessConfig(
+            kind=kind,
+            binary=(
+                _require_text(binary, f'harnesses[{index}].binary')
+                if binary is not None
+                else default_binaries.get(kind)
+            ),
+        ))
+    if len({harness.kind for harness in harnesses}) != len(harnesses):
         raise ValueError('harnesses must not contain duplicates.')
-    return tuple(value)
+    return tuple(harnesses)
 
 
 def persist_worker_id(

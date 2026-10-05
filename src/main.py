@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import argparse
+from functools import partial
 
 from clients.activity_client import ActivityRunClient
 from clients.pipeline_client import PipelineRunClaimClient
 from clients.worker_client import WorkerHeartbeatClient
 from configuration.runtime import load_config
 from harnesses.capabilities import validate_harness_capabilities
+from harnesses.executor import execute_harness
 from polling.loop import run_forever
 from polling.worker import RuntimeWorker
 from provisioning import provision_missing_workers
@@ -40,7 +42,7 @@ def main() -> None:
             config_path=arguments.config,
             config=config,
             client=worker_client,
-            harnesses=config.harnesses,
+            harnesses=config.harness_kinds,
         )
     activity_client = ActivityRunClient(
         api_base_url=config.api_base_url,
@@ -57,6 +59,7 @@ def main() -> None:
         execute_claim=ActivityExecutor(
             activity_client=activity_client,
             pipeline_client=pipeline_client,
+            harness_runner=partial(execute_harness, binaries=config.harness_binaries),
         ).execute_claim,
     )
     run_forever(
