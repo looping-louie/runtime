@@ -38,6 +38,7 @@ class RuntimeConfig:
     api_base_url: str
     user_id: str
     poll_interval_seconds: float
+    harnesses: tuple[str, ...]
     projects: tuple[ProjectCheckout, ...]
 
     def checkout_for(self, project_id: str) -> ProjectCheckout:
@@ -83,7 +84,7 @@ def load_config(path: str | Path) -> RuntimeConfig:
         raise ValueError('Runtime configuration must be a JSON object.')
     _reject_unknown_fields(
         raw,
-        {'api_base_url', 'user_id', 'poll_interval_seconds', 'projects'},
+        {'api_base_url', 'user_id', 'poll_interval_seconds', 'harnesses', 'projects'},
         'Runtime configuration',
     )
     return RuntimeConfig(
@@ -92,6 +93,7 @@ def load_config(path: str | Path) -> RuntimeConfig:
         poll_interval_seconds=_require_positive_number(
             raw.get('poll_interval_seconds'), 'poll_interval_seconds',
         ),
+        harnesses=_parse_harnesses(raw.get('harnesses')),
         projects=_parse_projects(raw.get('projects')),
     )
 
@@ -130,6 +132,24 @@ def _parse_projects(value: object) -> tuple[ProjectCheckout, ...]:
             )
         )
     return tuple(projects)
+
+
+def _parse_harnesses(value: object) -> tuple[str, ...]:
+    """Validate the Harnesses this runtime is configured to execute."""
+
+    supported_harnesses = frozenset({'louie', 'codex_cli', 'copilot_cli'})
+    if not isinstance(value, list) or not value:
+        raise ValueError('harnesses must be a non-empty array.')
+    if not all(
+        isinstance(harness, str) and harness in supported_harnesses
+        for harness in value
+    ):
+        raise ValueError('harnesses contains an unsupported Harness.')
+    if len(set(value)) != len(value):
+        raise ValueError('harnesses must not contain duplicates.')
+    if 'louie' not in value:
+        raise ValueError('harnesses must include louie.')
+    return tuple(value)
 
 
 def persist_worker_id(

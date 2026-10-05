@@ -9,6 +9,11 @@
   # the time (in seconds) between two consecutive requests to the API
   # Example: 2
   "poll_interval_seconds": ,
+  # Harnesses this runtime is allowed to execute. Include "louie" and add only
+  # CLI Harnesses installed and authenticated on this machine.
+  # Supported values: "louie", "codex_cli", "copilot_cli"
+  # Example: ["louie", "codex_cli"]
+  "harnesses": ["louie"],
   # Each worker maps API projects to local repository checkouts. This keeps a
   # worker from executing a task in an arbitrary directory supplied by an API
   # run.

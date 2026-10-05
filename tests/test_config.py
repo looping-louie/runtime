@@ -19,31 +19,34 @@ def write_config(tmp_path: Path, payload: dict[str, object]) -> Path:
     return path
 
 
+def config_payload(checkout_path: Path | str = '/checkout') -> dict[str, object]:
+    """Return a valid configuration payload with one project mapping."""
+
+    return {
+        'api_base_url': 'http://127.0.0.1:8000/api/v1',
+        'user_id': 'user-local',
+        'poll_interval_seconds': 2,
+        'harnesses': ['louie'],
+        'projects': [{
+            'project_id': 'project-local',
+            'worker_id': 'worker-1',
+            'repository_path': str(checkout_path),
+        }],
+    }
+
+
 def test_load_config_resolves_workspace_checkout(tmp_path: Path) -> None:
     """A runtime maps every configured project to one checkout path."""
 
     checkout_path = tmp_path / 'checkout'
     checkout_path.mkdir()
-    config = load_config(
-        write_config(
-            tmp_path,
-            {
-                'api_base_url': 'http://127.0.0.1:8000/api/v1/',
-                'user_id': 'user-local',
-                'poll_interval_seconds': 2,
-                'projects': [
-                    {
-                        'project_id': 'project-local',
-                        'worker_id': 'worker-1',
-                        'repository_path': str(checkout_path),
-                    }
-                ],
-            },
-        )
-    )
+    payload = config_payload(checkout_path)
+    payload['harnesses'] = ['louie', 'codex_cli']
+    config = load_config(write_config(tmp_path, payload))
 
     assert config.api_base_url == 'http://127.0.0.1:8000/api/v1'
     assert config.user_id == 'user-local'
+    assert config.harnesses == ('louie', 'codex_cli')
     assert config.checkout_for('project-local').repository_path == checkout_path
     assert config.checkout_for('project-local').worker_id == 'worker-1'
 
@@ -51,51 +54,48 @@ def test_load_config_resolves_workspace_checkout(tmp_path: Path) -> None:
 def test_load_config_rejects_duplicate_workspace_mapping(tmp_path: Path) -> None:
     """Duplicate mappings cannot make a claimed run choose an arbitrary checkout."""
 
-    path = write_config(
-        tmp_path,
-        {
-            'api_base_url': 'http://127.0.0.1:8000/api/v1',
-            'user_id': 'user-local',
-            'poll_interval_seconds': 2,
-            'projects': [
-                {
-                    'project_id': 'project-local',
-                    'worker_id': 'worker-1',
-                    'repository_path': '/first',
-                },
-                {
-                    'project_id': 'project-local',
-                    'worker_id': 'worker-2',
-                    'repository_path': '/second',
-                },
-            ],
-        },
-    )
+    payload = config_payload()
+    payload['projects'] = [
+        {'project_id': 'project-local', 'worker_id': 'worker-1', 'repository_path': '/first'},
+        {'project_id': 'project-local', 'worker_id': 'worker-2', 'repository_path': '/second'},
+    ]
 
     with pytest.raises(ValueError, match='duplicate project_id'):
-        load_config(path)
+        load_config(write_config(tmp_path, payload))
 
 
 def test_load_config_requires_user_identity(tmp_path: Path) -> None:
     """API communication cannot start without an explicit acting User."""
 
-    path = write_config(
-        tmp_path,
-        {
-            'api_base_url': 'http://127.0.0.1:8000/api/v1',
-            'poll_interval_seconds': 2,
-            'projects': [
-                {
-                    'project_id': 'project-local',
-                    'worker_id': 'worker-1',
-                    'repository_path': '/checkout',
-                }
-            ],
-        },
-    )
+    payload = config_payload()
+    del payload['user_id']
 
     with pytest.raises(ValueError, match='user_id'):
-        load_config(path)
+        load_config(write_config(tmp_path, payload))
+
+
+@pytest.mark.parametrize(
+    ('harnesses', 'message'),
+    (
+        (None, 'non-empty array'),
+        ([], 'non-empty array'),
+        (['louie', 'louie'], 'must not contain duplicates'),
+        (['codex_cli'], 'must include louie'),
+        (['louie', 'unknown'], 'unsupported Harness'),
+    ),
+)
+def test_load_config_rejects_invalid_harness_declaration(
+    tmp_path: Path,
+    harnesses: object,
+    message: str,
+) -> None:
+    """Harness declarations must be explicit, supported, and unambiguous."""
+
+    payload = config_payload()
+    payload['harnesses'] = harnesses
+
+    with pytest.raises(ValueError, match=message):
+        load_config(write_config(tmp_path, payload))
 
 
 def test_validate_checkouts_requires_git_repository(tmp_path: Path) -> None:
@@ -103,23 +103,7 @@ def test_validate_checkouts_requires_git_repository(tmp_path: Path) -> None:
 
     checkout_path = tmp_path / 'checkout'
     checkout_path.mkdir()
-    config = load_config(
-        write_config(
-            tmp_path,
-            {
-                'api_base_url': 'http://127.0.0.1:8000/api/v1',
-                'user_id': 'user-local',
-                'poll_interval_seconds': 2,
-                'projects': [
-                    {
-                        'project_id': 'project-local',
-                        'worker_id': 'worker-1',
-                        'repository_path': str(checkout_path),
-                    }
-                ],
-            },
-        )
-    )
+    config = load_config(write_config(tmp_path, config_payload(checkout_path)))
 
     with pytest.raises(ValueError, match='not a Git repository'):
         config.validate_checkouts()
@@ -132,23 +116,7 @@ def test_validate_checkouts_rejects_dirty_git_repository(tmp_path: Path) -> None
     checkout_path.mkdir()
     subprocess.run(['git', '-C', str(checkout_path), 'init'], check=True)
     (checkout_path / 'unrelated.txt').write_text('do not commit\n', encoding='utf-8')
-    config = load_config(
-        write_config(
-            tmp_path,
-            {
-                'api_base_url': 'http://127.0.0.1:8000/api/v1',
-                'user_id': 'user-local',
-                'poll_interval_seconds': 2,
-                'projects': [
-                    {
-                        'project_id': 'project-local',
-                        'worker_id': 'worker-1',
-                        'repository_path': str(checkout_path),
-                    }
-                ],
-            },
-        )
-    )
+    config = load_config(write_config(tmp_path, config_payload(checkout_path)))
 
     with pytest.raises(ValueError, match='contains uncommitted changes'):
         config.validate_checkouts()
@@ -160,23 +128,7 @@ def test_validate_checkouts_accepts_clean_git_repository(tmp_path: Path) -> None
     checkout_path = tmp_path / 'checkout'
     checkout_path.mkdir()
     subprocess.run(['git', '-C', str(checkout_path), 'init'], check=True)
-    config = load_config(
-        write_config(
-            tmp_path,
-            {
-                'api_base_url': 'http://127.0.0.1:8000/api/v1',
-                'user_id': 'user-local',
-                'poll_interval_seconds': 2,
-                'projects': [
-                    {
-                        'project_id': 'project-local',
-                        'worker_id': 'worker-1',
-                        'repository_path': str(checkout_path),
-                    }
-                ],
-            },
-        )
-    )
+    config = load_config(write_config(tmp_path, config_payload(checkout_path)))
 
     config.validate_checkouts()
 
@@ -184,20 +136,11 @@ def test_validate_checkouts_accepts_clean_git_repository(tmp_path: Path) -> None
 def test_persist_worker_id_completes_initial_project_provisioning(tmp_path: Path) -> None:
     """An API-generated worker ID is stored for subsequent runtime starts."""
 
-    path = write_config(
-        tmp_path,
-        {
-            'api_base_url': 'http://127.0.0.1:8000/api/v1',
-            'user_id': 'user-local',
-            'poll_interval_seconds': 2,
-            'projects': [
-                {
-                    'project_id': 'project-local',
-                    'repository_path': '/checkout',
-                }
-            ],
-        },
-    )
+    payload = config_payload()
+    project = payload['projects'][0]
+    assert isinstance(project, dict)
+    project.pop('worker_id')
+    path = write_config(tmp_path, payload)
 
     assert load_config(path).checkout_for('project-local').worker_id is None
 

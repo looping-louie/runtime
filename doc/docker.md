@@ -15,12 +15,13 @@ checkout it manages. Set `repository_path` in the runtime JSON configuration to
 the checkout path inside the container, then start the worker:
 
 ```sh
-export CHECKOUT_PATH=/absolute/path/to/checkout
+export REPO_PATH=/absolute/path/to/checkout
+export CONFIG_PATH="$PWD/runtime-config"
 
 docker run --rm \
   --user "$(id -u):$(id -g)" \
   --add-host host.docker.internal:host-gateway \
-  -v "$PWD/runtime-config:/runtime-config" \
+  -v "$CONFIG_PATH:/runtime-config" \
   -v "$CHECKOUT_PATH:/workspaces/project" \
   looping-louie-runtime:latest \
   --config /runtime-config/runtime.json
@@ -34,6 +35,7 @@ mapping whose `repository_path` is `/workspaces/project`:
   "api_base_url": "http://host.docker.internal:2000/api/v1",
   "user_id": "local-user",
   "poll_interval_seconds": 2,
+  "harnesses": ["louie"],
   "projects": [
     {
       "project_id": "local-project",

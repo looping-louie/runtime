@@ -71,6 +71,7 @@ def test_run_once_executes_claim_in_its_mapped_checkout(tmp_path: Path) -> None:
             api_base_url='http://127.0.0.1:8000/api/v1',
             user_id='user-1',
             poll_interval_seconds=1,
+            harnesses=('louie',),
             projects=(
                 ProjectCheckout('project-1', 'worker-1', first_checkout),
                 ProjectCheckout('project-2', 'worker-2', second_checkout),
@@ -102,6 +103,7 @@ def test_worker_heartbeats_each_provisioned_workspace_worker(
             api_base_url='http://127.0.0.1:8000/api/v1',
             user_id='user-1',
             poll_interval_seconds=1,
+            harnesses=('louie', 'codex_cli'),
             projects=(
                 ProjectCheckout('project-1', 'worker-1', first_checkout),
                 ProjectCheckout('project-2', 'worker-2', second_checkout),
@@ -109,7 +111,6 @@ def test_worker_heartbeats_each_provisioned_workspace_worker(
         ),
         claim_client=FakeClaimClient({'project-1': None, 'project-2': None}),
         heartbeat_client=heartbeat_client,
-        harness_capabilities=lambda: ('louie', 'codex_cli'),
         execute_claim=lambda _claim, _checkout: None,
     )
 
@@ -154,6 +155,7 @@ def test_run_once_continues_after_one_workspace_execution_fails(
             api_base_url='http://127.0.0.1:8000/api/v1',
             user_id='user-1',
             poll_interval_seconds=1,
+            harnesses=('louie',),
             projects=(
                 ProjectCheckout('project-1', 'worker-1', first_checkout),
                 ProjectCheckout('project-2', 'worker-2', second_checkout),

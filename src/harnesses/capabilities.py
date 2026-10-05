@@ -1,58 +1,36 @@
-"""Detect locally executable Harness capabilities for worker provisioning."""
+"""Validate configured local Harness capabilities for worker provisioning."""
 
 from __future__ import annotations
 
 import os
 import subprocess
-from time import monotonic
 from typing import Callable
 
 
-class HarnessCapabilityDetector:
-    """Cache local Harness readiness for bounded heartbeat refreshes."""
-
-    def __init__(
-        self,
-        *,
-        refresh_interval_seconds: float = 30,
-        clock: Callable[[], float] = monotonic,
-        detect: Callable[[], tuple[str, ...]] | None = None,
-    ) -> None:
-        """Store the refresh cadence and injectable detection boundaries."""
-
-        self._refresh_interval_seconds = refresh_interval_seconds
-        self._clock = clock
-        self._detect = detect or detect_harness_capabilities
-        self._capabilities: tuple[str, ...] | None = None
-        self._refresh_after = 0.0
-
-    def current(self) -> tuple[str, ...]:
-        """Return recent capabilities, refreshing local authentication when stale."""
-
-        now = self._clock()
-        if self._capabilities is None or now >= self._refresh_after:
-            self._capabilities = self._detect()
-            self._refresh_after = now + self._refresh_interval_seconds
-        return self._capabilities
-
-
-def detect_harness_capabilities(
+def validate_harness_capabilities(
+    harnesses: tuple[str, ...],
     *,
     run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
-) -> tuple[str, ...]:
-    """Advertise executable, authenticated Harness CLIs available locally."""
+) -> None:
+    """Require every configured Harness executable to be locally ready."""
 
-    capabilities = ['louie']
-    command = os.environ.get('LOUIE_CODEX_COMMAND', 'codex').strip()
-    if command and _command_succeeds([command, 'login', 'status'], run=run):
-        capabilities.append('codex_cli')
-    copilot_command = os.environ.get('LOUIE_COPILOT_COMMAND', 'copilot').strip()
-    if copilot_command and _command_succeeds(
-        [copilot_command, '--version'],
-        run=run,
-    ):
-        capabilities.append('copilot_cli')
-    return tuple(capabilities)
+    checks = {
+        'codex_cli': [_command('LOUIE_CODEX_COMMAND', 'codex'), 'login', 'status'],
+        'copilot_cli': [_command('LOUIE_COPILOT_COMMAND', 'copilot'), '--version'],
+    }
+    for harness in harnesses:
+        command = checks.get(harness)
+        if command is not None and not _command_succeeds(command, run=run):
+            raise RuntimeError(
+                f"Configured Harness {harness!r} is unavailable: "
+                f"{' '.join(command)!r} did not succeed."
+            )
+
+
+def _command(variable: str, default: str) -> str:
+    """Return the configured Harness command or an empty invalid command."""
+
+    return os.environ.get(variable, default).strip()
 
 
 def _command_succeeds(

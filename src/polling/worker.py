@@ -56,7 +56,7 @@ class RuntimeWorker:
         self._config = config
         self._claim_client = claim_client
         self._heartbeat_client = heartbeat_client
-        self._harness_capabilities = harness_capabilities or (lambda: ('louie',))
+        self._harness_capabilities = harness_capabilities or (lambda: config.harnesses)
         self._execute_claim = execute_claim
 
     def run_once(self) -> int:
