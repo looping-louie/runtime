@@ -8,7 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from configuration.runtime import HarnessConfig, load_config, persist_worker_id
+from configuration.runtime import (
+    HarnessConfig,
+    initialize_config,
+    load_config,
+    persist_worker_id,
+)
 
 
 def write_config(tmp_path: Path, payload: dict[str, object]) -> Path:
@@ -173,3 +178,55 @@ def test_persist_worker_id_completes_initial_project_provisioning(tmp_path: Path
     persist_worker_id(path, project_id='project-local', worker_id='worker-1')
 
     assert load_config(path).checkout_for('project-local').worker_id == 'worker-1'
+
+
+def test_initialize_config_creates_a_first_start_configuration(tmp_path: Path) -> None:
+    """First-start flags materialize a valid writable runtime configuration."""
+
+    defaults_path = write_config(tmp_path, {
+        'api_base_url': '',
+        'user_id': '',
+        'poll_interval_seconds': 2,
+        'harnesses': [],
+        'projects': [],
+    })
+    config_path = tmp_path / 'runtime-config' / 'runtime.json'
+
+    created = initialize_config(
+        config_path,
+        defaults_path=defaults_path,
+        api_base_url='http://host.docker.internal:2000/api/v1',
+        user_id='local-user',
+        project_id='local-project',
+        repository_path='/workspaces/project',
+        harnesses=('codex_cli',),
+        poll_interval_seconds=None,
+    )
+
+    config = load_config(config_path)
+
+    assert created is True
+    assert config.api_base_url == 'http://host.docker.internal:2000/api/v1'
+    assert config.poll_interval_seconds == 2
+    assert config.harnesses == (HarnessConfig(kind='codex_cli', binary='codex'),)
+    assert config.checkout_for('local-project').repository_path == Path('/workspaces/project')
+
+
+def test_initialize_config_preserves_an_existing_configuration(tmp_path: Path) -> None:
+    """First-start flags never replace a provisioned runtime configuration."""
+
+    config_path = write_config(tmp_path, config_payload())
+
+    created = initialize_config(
+        config_path,
+        defaults_path=config_path,
+        api_base_url=None,
+        user_id=None,
+        project_id=None,
+        repository_path=None,
+        harnesses=(),
+        poll_interval_seconds=None,
+    )
+
+    assert created is False
+    assert load_config(config_path).user_id == 'user-local'

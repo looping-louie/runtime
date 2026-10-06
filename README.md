@@ -36,7 +36,7 @@ pip install .
 Before starting the runtime, create `runtime.json` in the directory where you
 will run the commands below. A [template](./assets/config/runtime.json.tpl) for
 this file is available at the `assets` directory. You can copy it and fill in
-your specific configuration (remove the comments to make it a valid JSON).
+your specific configuration. Remove its comments to make it valid JSON.
 
 ```sh
 cp assets/config/runtime.json.tpl runtime.json

@@ -8,17 +8,21 @@
   "user_id": "",
   # the time (in seconds) between two consecutive requests to the API
   # Example: 2
-  "poll_interval_seconds": ,
-  # Harnesses this runtime is allowed to execute. Each entry has a required
-  # kind. CLI Harnesses may set binary to an executable path; it defaults to
-  # "codex" or "copilot". Delete unavailable entries. An empty list receives
-  # no work.
-  # Supported kinds: "louie", "codex_cli", "copilot_cli"
-  "harnesses": [
-    { "kind": "louie" },
-    { "kind": "codex_cli", "binary": "codex" },
-    { "kind": "copilot_cli", "binary": "copilot" }
-  ],
+  "poll_interval_seconds": 2,
+  # Harnesses this runtime is allowed to execute. Each item is an object with
+  # a required kind. Supported kinds: "louie", "codex_cli", "copilot_cli".
+  #
+  # Examples:
+  #   { "kind": "louie" }
+  #   { "kind": "codex_cli" }
+  #   { "kind": "copilot_cli", "binary": "/opt/bin/copilot" }
+  #
+  # binary applies only to codex_cli and copilot_cli. It defaults to "codex"
+  # or "copilot" and may name another executable path. Add a CLI Harness only
+  # after its local authentication is configured. The Docker image includes
+  # both binaries but starts with no declared Harnesses, preventing it from
+  # claiming work before this machine is ready. An empty list receives no work.
+  "harnesses": [],
   # Each worker maps API projects to local repository checkouts. This keeps a
   # worker from executing a task in an arbitrary directory supplied by an API
   # run.

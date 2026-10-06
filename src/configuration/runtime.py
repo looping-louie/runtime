@@ -122,6 +122,53 @@ def load_config(path: str | Path) -> RuntimeConfig:
     )
 
 
+def initialize_config(
+    path: str | Path,
+    *,
+    defaults_path: str | Path,
+    api_base_url: str | None,
+    user_id: str | None,
+    project_id: str | None,
+    repository_path: str | None,
+    harnesses: tuple[str, ...],
+    poll_interval_seconds: float | None,
+) -> bool:
+    """Create a first-start runtime configuration without replacing an existing one."""
+
+    config_path = Path(path)
+    if config_path.exists():
+        return False
+    required_values = {
+        'api_base_url': api_base_url,
+        'user_id': user_id,
+        'project_id': project_id,
+        'repository_path': repository_path,
+    }
+    missing = [name for name, value in required_values.items() if value is None]
+    if missing:
+        raise ValueError(
+            'Missing first-start configuration flags: ' + ', '.join(missing) + '.'
+        )
+    defaults = _read_json_object(Path(defaults_path))
+    defaults.update({
+        'api_base_url': api_base_url,
+        'user_id': user_id,
+        'poll_interval_seconds': (
+            poll_interval_seconds
+            if poll_interval_seconds is not None
+            else defaults.get('poll_interval_seconds')
+        ),
+        'harnesses': [{'kind': harness} for harness in harnesses],
+        'projects': [{
+            'project_id': project_id,
+            'repository_path': repository_path,
+        }],
+    })
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    _atomic_write_json(config_path, defaults)
+    return True
+
+
 def _parse_projects(value: object) -> tuple[ProjectCheckout, ...]:
     """Validate distinct project mappings from JSON configuration."""
 
@@ -234,9 +281,9 @@ def _read_json_object(path: Path) -> dict[str, Any]:
 
 
 def _atomic_write_json(path: Path, value: dict[str, Any]) -> None:
-    """Replace a configuration file without exposing a partial worker ID write."""
+    """Create or replace a configuration file without exposing a partial write."""
 
-    mode = stat.S_IMODE(path.stat().st_mode)
+    mode = stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o600
     temporary_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(
