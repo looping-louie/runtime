@@ -16,13 +16,9 @@ For a containerized installation, follow the instructions in
 
 Clone this repo and install using pip:
 
-```sh
-pip install .
-```
-
 > [!CAUTION]
 >
-> It is strongly recommended to run the above command in a virtualenv created
+> It is strongly recommended to run the below commands in a virtualenv created
 > for this project. All subsequent instructions assume you have created and
 > activated such virtual environment.
 >
@@ -31,12 +27,16 @@ pip install .
 > . env/bin/activate
 > ```
 
+```sh
+pip install .
+```
+
 ### Configuration
 
 Before starting the runtime, create `runtime.json` in the directory where you
 will run the commands below. A [template](./assets/config/runtime.json.tpl) for
 this file is available at the `assets` directory. You can copy it and fill in
-your specific configuration (remove the comments to make it a valid JSON).
+your specific configuration. Remove its comments to make it valid JSON.
 
 ```sh
 cp assets/config/runtime.json.tpl runtime.json
@@ -50,6 +50,9 @@ A full `runtime.json` configuration file should resemble something like this:
   "api_base_url": "http://127.0.0.1:2000/api/v1",
   "user_id": "local-user",
   "poll_interval_seconds": 2,
+  "harnesses": [
+    { "kind": "louie" }
+  ],
   "projects": [
     {
       "project_id": "project-id",
@@ -91,14 +94,20 @@ Pipeline and Activity checkpoint behavior is documented in
 
 ### Harness configuration and availability
 
-The runtime detects locally available Harnesses during worker provisioning and
-on subsequent heartbeats. Detection is refreshed every 30 seconds, so changing
-local CLI installation or authentication can affect claim admission without
-replacing the persisted `worker_id`.
+The required `harnesses` list in `runtime.json` declares every Harness the
+runtime is allowed to execute and publish to the API. Each declaration has a
+required `kind`: `louie`, `codex_cli`, or `copilot_cli`. An empty list keeps
+the worker connected but unable to claim Harness work. The
+[configuration template](assets/config/runtime.json.tpl) documents every
+available field.
 
-- `louie` is always advertised.
-- `codex_cli` is advertised when `LOUIE_CODEX_COMMAND` (default: `codex`)
-  successfully runs both `--version` and `login status`.
-- `copilot_cli` is advertised when `LOUIE_COPILOT_COMMAND` (default:
-  `copilot`) successfully runs `--version`. Copilot authentication is checked
-  only when the runtime executes a Copilot turn.
+Startup and `--check` validate every declared CLI Harness:
+
+- `codex_cli` uses its optional `binary` field (default: `codex`) to pass
+  `login status`.
+- `copilot_cli` uses its optional `binary` field (default: `copilot`) to pass
+  `--version`.
+
+The Docker image includes both CLI executables. Installing an executable does
+not authenticate it; configure authentication before declaring its Harness in
+`runtime.json`.

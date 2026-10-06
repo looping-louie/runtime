@@ -18,6 +18,8 @@ HARNESS_ADAPTERS = {
 def execute_harness(
     response: Mapping[str, object],
     checkout_path: Path,
+    *,
+    binaries: Mapping[str, str],
 ) -> dict[str, object]:
     """Execute one checkpoint through the adapter selected by its frozen Harness."""
 
@@ -31,4 +33,8 @@ def execute_harness(
     adapter = HARNESS_ADAPTERS.get(identity)
     if adapter is None:
         raise RuntimeError('Activity response selects an unsupported Harness.')
-    return adapter(response, checkout_path)
+    kind = identity[0]
+    binary = binaries.get(kind)
+    if binary is None:
+        raise RuntimeError(f'Configured Harness {kind!r} has no binary.')
+    return adapter(response, checkout_path, binary=binary)

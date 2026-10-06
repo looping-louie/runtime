@@ -24,7 +24,10 @@ from .observations import parse_copilot_events
 
 
 def execute_copilot_cli(
-    response: Mapping[str, object], checkout_path: Path
+    response: Mapping[str, object],
+    checkout_path: Path,
+    *,
+    binary: str = 'copilot',
 ) -> dict[str, object]:
     """Run Copilot in the mapped checkout and return the checkpoint result."""
 
@@ -43,9 +46,6 @@ def execute_copilot_cli(
         payload = _require_payload(response)
         _require_copilot_harness(payload)
         requested_model = _require_requested_model(payload)
-        command = os.environ.get('LOUIE_COPILOT_COMMAND', 'copilot').strip()
-        if not command:
-            raise ValueError('LOUIE_COPILOT_COMMAND must not be empty.')
         snapshot = _require_instruction_snapshot(payload)
         turn = _turn(payload)
         phase = str(turn.get('phase', 'execute'))
@@ -59,7 +59,7 @@ def execute_copilot_cli(
                 response, payload, instructions, commit_forbidden=commit_forbidden
             )
             result = subprocess.run(
-                _command(command, requested_model, turn, prompt),
+                _command(binary, requested_model, turn, prompt),
                 capture_output=True,
                 cwd=checkout_path,
                 text=True,

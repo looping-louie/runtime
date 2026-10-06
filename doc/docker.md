@@ -8,45 +8,58 @@ Build the image from the repository root:
 docker build -t looping-louie-runtime:latest .
 ```
 
-## Start the runtime
-
-The runtime needs writable access to its configuration directory and each Git
-checkout it manages. Set `repository_path` in the runtime JSON configuration to
-the checkout path inside the container, then start the worker:
+The image includes the `codex` and `copilot` executables. Their pinned package
+versions can be replaced at build time:
 
 ```sh
-export CHECKOUT_PATH=/absolute/path/to/checkout
+docker build \
+  --build-arg CODEX_CLI_VERSION=0.160.0 \
+  --build-arg COPILOT_CLI_VERSION=1.0.91 \
+  -t looping-louie-runtime:latest .
+```
+
+Installing an executable does not authenticate it. Declare only the Harnesses
+that are configured and authenticated for this container in `runtime.json`.
+For example, use `[{'kind': 'codex_cli'}]` only after Codex authentication is
+available. Use `[]` for a connected worker that must not receive Harness work.
+
+## Start the runtime
+
+The image creates `/app/config/runtime.json` during its first start from
+the shared [configuration template](../assets/config/runtime.json.tpl). Mount a
+writable configuration directory and each Git checkout the worker manages:
+
+```sh
+export SOME_PROJECT_PATH=/absolute/path/to/project/checkout
+export OTHER_PROJECT_PATH=/absolute/path/to/other/project/checkout
+export CONFIG_PATH=/absolute/path/to/config/folder
 
 docker run --rm \
   --user "$(id -u):$(id -g)" \
   --add-host host.docker.internal:host-gateway \
-  -v "$PWD/runtime-config:/runtime-config" \
-  -v "$CHECKOUT_PATH:/workspaces/project" \
+  -v "$CONFIG_PATH:/app/config" \
+  -v "$SOME_PROJECT_PATH:/app/data/projects/some-project" \
+  -v "$OTHER_PROJECT_PATH:/app/data/projects/other-project" \
   looping-louie-runtime:latest \
-  --config /runtime-config/runtime.json
+  --api-base-url http://host.docker.internal:2000/api/v1 \
+  --user-id local-user \
+  --project some-project-id:/app/data/projects/some-project \
+  --project other-project-id:/app/data/projects/other-project \
+  --harness louie
 ```
 
-For the command above, `runtime-config/runtime.json` must contain a project
-mapping whose `repository_path` is `/workspaces/project`:
+The image has a default `--config /app/config/runtime.json` command. The
+first-start flags create that file from image defaults with the supplied API,
+User, Project, checkout, and Harness values. Repeat `--project` for each
+`PROJECT_ID:REPOSITORY_PATH` mapping and mount its host checkout at that path.
+Repeated `--harness` flags declare multiple capabilities, such as
+`--harness codex_cli --harness copilot_cli`.
 
-```json
-{
-  "api_base_url": "http://host.docker.internal:2000/api/v1",
-  "user_id": "local-user",
-  "poll_interval_seconds": 2,
-  "projects": [
-    {
-      "project_id": "local-project",
-      "repository_path": "/workspaces/project"
-    }
-  ]
-}
-```
-
-The runtime registers missing workers and atomically writes the generated
-`worker_id` to its configuration. Mount the containing `runtime-config`
-directory rather than mounting `runtime.json` as an individual file, so that
-write succeeds.
+After the first start, the runtime reuses the existing configuration and
+ignores these initialization flags. Change configuration by editing or removing
+`config/runtime.json`; never mount that file individually. The runtime
+registers missing workers and atomically writes the generated `worker_id` to
+the mounted configuration directory.
 
 The `--user` option makes files created in the mounted configuration directory
 and checkout belong to the current host user.

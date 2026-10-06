@@ -79,10 +79,11 @@ at `.agents/skills/<name>/SKILL.md`; Copilot materializes them at
 `.github/skills/<name>/SKILL.md`. Temporary Skill directories are removed before
 the checkout diff is collected.
 
-The runtime reads machine-owned settings: `LOUIE_CODEX_COMMAND` defaults to
-`codex`, `LOUIE_CODEX_SANDBOX` to `workspace-write`,
-`LOUIE_CODEX_TIMEOUT_SECONDS` to `1800`, `LOUIE_COPILOT_COMMAND` to `copilot`,
-and `LOUIE_COPILOT_TIMEOUT_SECONDS` to `1800`. Codex authentication remains
+The runtime reads CLI executable locations from each Harness declaration in
+`runtime.json`: `codex_cli.binary` defaults to `codex` and
+`copilot_cli.binary` defaults to `copilot`. `LOUIE_CODEX_SANDBOX` defaults to
+`workspace-write`; `LOUIE_CODEX_TIMEOUT_SECONDS` and
+`LOUIE_COPILOT_TIMEOUT_SECONDS` default to `1800`. Codex authentication remains
 local to the worker and does not use API Linked Services.
 
 ### 3. Report outcomes and continue the Pipeline
