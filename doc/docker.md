@@ -43,8 +43,8 @@ docker run --rm \
   looping-louie-runtime:latest \
   --api-base-url http://host.docker.internal:2000/api/v1 \
   --user-id local-user \
-  --project some-project:/app/data/projects/some-project \
-  --project other-project:/app/data/projects/other-project \
+  --project some-project-id:/app/data/projects/some-project \
+  --project other-project-id:/app/data/projects/other-project \
   --harness louie
 ```
 
