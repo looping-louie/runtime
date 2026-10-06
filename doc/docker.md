@@ -38,13 +38,13 @@ docker run --rm \
   --user "$(id -u):$(id -g)" \
   --add-host host.docker.internal:host-gateway \
   -v "$CONFIG_PATH:/app/config" \
-  -v "$SOME_PROJECT_PATH:/app/data/workspaces/some-project" \
-  -v "$OTHER_PROJECT_PATH:/app/data/workspaces/other-project" \
+  -v "$SOME_PROJECT_PATH:/app/data/projects/some-project" \
+  -v "$OTHER_PROJECT_PATH:/app/data/projects/other-project" \
   looping-louie-runtime:latest \
   --api-base-url http://host.docker.internal:2000/api/v1 \
   --user-id local-user \
-  --project some-project:/app/data/workspaces/project \
-  --project other-project:/app/data/workspaces/other-project \
+  --project some-project:/app/data/projects/some-project \
+  --project other-project:/app/data/projects/other-project \
   --harness louie
 ```
 

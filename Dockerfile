@@ -22,7 +22,7 @@ COPY pyproject.toml ./
 COPY assets/config/runtime.json.tpl /app/assets/runtime.json.tpl
 COPY src ./src
 
-RUN mkdir -p /app/config /app/data/workspaces \
+RUN mkdir -p /app/config /app/data/projects \
     && grep -v '^[[:space:]]*#' /app/assets/runtime.json.tpl > /app/assets/default-runtime.json \
     && pip install --no-cache-dir .
 

@@ -12,9 +12,9 @@ from main import _project_mapping
 def test_project_mapping_parses_a_project_id_and_checkout_path() -> None:
     """The repeatable project flag keeps a checkout path after its first colon."""
 
-    assert _project_mapping('project-1:/app/data/workspaces/project:archive') == (
+    assert _project_mapping('project-1:/app/data/projects/project:archive') == (
         'project-1',
-        '/app/data/workspaces/project:archive',
+        '/app/data/projects/project:archive',
     )
 
 

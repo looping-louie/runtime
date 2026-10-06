@@ -198,8 +198,8 @@ def test_initialize_config_creates_a_first_start_configuration(tmp_path: Path) -
         api_base_url='http://host.docker.internal:2000/api/v1',
         user_id='local-user',
         projects=(
-            ('local-project', '/app/data/workspaces/project'),
-            ('other-project', '/app/data/workspaces/other-project'),
+            ('local-project', '/app/data/projects/local-project'),
+            ('other-project', '/app/data/projects/other-project'),
         ),
         harnesses=('codex_cli',),
         poll_interval_seconds=None,
@@ -212,10 +212,10 @@ def test_initialize_config_creates_a_first_start_configuration(tmp_path: Path) -
     assert config.poll_interval_seconds == 2
     assert config.harnesses == (HarnessConfig(kind='codex_cli', binary='codex'),)
     assert config.checkout_for('local-project').repository_path == Path(
-        '/app/data/workspaces/project',
+        '/app/data/projects/local-project',
     )
     assert config.checkout_for('other-project').repository_path == Path(
-        '/app/data/workspaces/other-project',
+        '/app/data/projects/other-project',
     )
 
 
