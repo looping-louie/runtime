@@ -128,8 +128,7 @@ def initialize_config(
     defaults_path: str | Path,
     api_base_url: str | None,
     user_id: str | None,
-    project_id: str | None,
-    repository_path: str | None,
+    projects: tuple[tuple[str, str], ...],
     harnesses: tuple[str, ...],
     poll_interval_seconds: float | None,
 ) -> bool:
@@ -141,10 +140,10 @@ def initialize_config(
     required_values = {
         'api_base_url': api_base_url,
         'user_id': user_id,
-        'project_id': project_id,
-        'repository_path': repository_path,
     }
     missing = [name for name, value in required_values.items() if value is None]
+    if not projects:
+        missing.append('project')
     if missing:
         raise ValueError(
             'Missing first-start configuration flags: ' + ', '.join(missing) + '.'
@@ -159,10 +158,10 @@ def initialize_config(
             else defaults.get('poll_interval_seconds')
         ),
         'harnesses': [{'kind': harness} for harness in harnesses],
-        'projects': [{
-            'project_id': project_id,
-            'repository_path': repository_path,
-        }],
+        'projects': [
+            {'project_id': project_id, 'repository_path': repository_path}
+            for project_id, repository_path in projects
+        ],
     })
     config_path.parent.mkdir(parents=True, exist_ok=True)
     _atomic_write_json(config_path, defaults)

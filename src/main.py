@@ -21,6 +21,17 @@ from runs.executor import ActivityExecutor
 DEFAULT_DOCKER_CONFIG = Path('/app/assets/default-runtime.json')
 
 
+def _project_mapping(value: str) -> tuple[str, str]:
+    """Parse one first-start Project ID and checkout path mapping."""
+
+    project_id, separator, repository_path = value.partition(':')
+    if not separator or not project_id or not repository_path:
+        raise argparse.ArgumentTypeError(
+            'project must use PROJECT_ID:REPOSITORY_PATH format.',
+        )
+    return project_id, repository_path
+
+
 def main() -> None:
     """Validate configuration and run the configured runtime worker indefinitely."""
 
@@ -35,12 +46,12 @@ def main() -> None:
         help='User ID used only to create a missing runtime configuration.',
     )
     parser.add_argument(
-        '--project-id',
-        help='Project ID used only to create a missing runtime configuration.',
-    )
-    parser.add_argument(
-        '--repository-path',
-        help='Checkout path used only to create a missing runtime configuration.',
+        '--project',
+        action='append',
+        type=_project_mapping,
+        default=[],
+        metavar='PROJECT_ID:REPOSITORY_PATH',
+        help='Project checkout mapping used only to create a missing runtime configuration.',
     )
     parser.add_argument(
         '--harness',
@@ -65,8 +76,7 @@ def main() -> None:
         defaults_path=DEFAULT_DOCKER_CONFIG,
         api_base_url=arguments.api_base_url,
         user_id=arguments.user_id,
-        project_id=arguments.project_id,
-        repository_path=arguments.repository_path,
+        projects=tuple(arguments.project),
         harnesses=tuple(arguments.harness),
         poll_interval_seconds=arguments.poll_interval_seconds,
     )

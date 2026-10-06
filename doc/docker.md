@@ -30,26 +30,30 @@ the shared [configuration template](../assets/config/runtime.json.tpl). Mount a
 writable configuration directory and each Git checkout the worker manages:
 
 ```sh
-export REPO_PATH=/absolute/path/to/checkout/folder
+export SOME_PROJECT_PATH=/absolute/path/to/project/checkout
+export OTHER_PROJECT_PATH=/absolute/path/to/other/project/checkout
 export CONFIG_PATH=/absolute/path/to/config/folder
 
 docker run --rm \
   --user "$(id -u):$(id -g)" \
   --add-host host.docker.internal:host-gateway \
   -v "$CONFIG_PATH:/app/config" \
-  -v "$REPO_PATH:/app/data/workspaces/project" \
+  -v "$SOME_PROJECT_PATH:/app/data/workspaces/some-project" \
+  -v "$OTHER_PROJECT_PATH:/app/data/workspaces/other-project" \
   looping-louie-runtime:latest \
   --api-base-url http://host.docker.internal:2000/api/v1 \
   --user-id local-user \
-  --project-id local-project \
-  --repository-path /app/data/workspaces/project \
+  --project some-project:/app/data/workspaces/project \
+  --project other-project:/app/data/workspaces/other-project \
   --harness louie
 ```
 
 The image has a default `--config /app/config/runtime.json` command. The
 first-start flags create that file from image defaults with the supplied API,
-User, Project, checkout, and Harness values. Repeated `--harness` flags declare
-multiple capabilities, such as `--harness codex_cli --harness copilot_cli`.
+User, Project, checkout, and Harness values. Repeat `--project` for each
+`PROJECT_ID:REPOSITORY_PATH` mapping and mount its host checkout at that path.
+Repeated `--harness` flags declare multiple capabilities, such as
+`--harness codex_cli --harness copilot_cli`.
 
 After the first start, the runtime reuses the existing configuration and
 ignores these initialization flags. Change configuration by editing or removing
