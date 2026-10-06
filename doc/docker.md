@@ -30,20 +30,19 @@ the shared [configuration template](../assets/config/runtime.json.tpl). Mount a
 writable configuration directory and each Git checkout the worker manages:
 
 ```sh
-export REPO_PATH=/absolute/path/to/checkout
-export CONFIG_PATH="$PWD/config"
-mkdir -p "$CONFIG_PATH"
+export REPO_PATH=/absolute/path/to/checkout/folder
+export CONFIG_PATH=/absolute/path/to/config/folder
 
 docker run --rm \
   --user "$(id -u):$(id -g)" \
   --add-host host.docker.internal:host-gateway \
   -v "$CONFIG_PATH:/app/config" \
-  -v "$REPO_PATH:/workspaces/project" \
+  -v "$REPO_PATH:/app/data/workspaces/project" \
   looping-louie-runtime:latest \
   --api-base-url http://host.docker.internal:2000/api/v1 \
   --user-id local-user \
   --project-id local-project \
-  --repository-path /workspaces/project \
+  --repository-path /app/data/workspaces/project \
   --harness louie
 ```
 

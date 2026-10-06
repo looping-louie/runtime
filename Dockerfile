@@ -22,7 +22,8 @@ COPY pyproject.toml ./
 COPY assets/config/runtime.json.tpl /app/assets/runtime.json.tpl
 COPY src ./src
 
-RUN grep -v '^[[:space:]]*#' /app/assets/runtime.json.tpl > /app/assets/default-runtime.json \
+RUN mkdir -p /app/config /app/data/workspaces \
+    && grep -v '^[[:space:]]*#' /app/assets/runtime.json.tpl > /app/assets/default-runtime.json \
     && pip install --no-cache-dir .
 
 ENTRYPOINT ["looping-louie-runtime"]
