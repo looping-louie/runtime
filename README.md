@@ -78,10 +78,11 @@ Start the worker from a normal terminal:
 looping-louie-runtime --config runtime.json
 ```
 
-On the first normal start, each project without a `worker_id` is provisioned
-through `POST /api/v1/workers`; the API-generated ID is written back to this
-`runtime.json` configuration file immediately and reused on later starts. Do
-not add `worker_id` yourself.
+On the first normal start, the runtime registers one global Worker through
+`POST /api/v1/workers/instances`; its API-generated ID is written to the top
+level of `runtime.json` immediately. Every configured Project is then enabled
+for that Worker. Later starts reuse the ID and safely reconcile the same
+Project enablements. Do not add `worker_id` yourself.
 
 The worker polls every configured project, claims at most one available run
 per project in each cycle, and waits for `poll_interval_seconds` before the

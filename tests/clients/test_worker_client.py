@@ -7,8 +7,8 @@ import httpx
 from clients.worker_client import WorkerHeartbeatClient
 
 
-def test_worker_client_heartbeats_provisioned_workspace_worker() -> None:
-    """Worker heartbeat selects the configured project and worker ID."""
+def test_worker_client_heartbeats_global_worker() -> None:
+    """Global Worker heartbeat selects a Project only for API authorization."""
 
     requests: list[httpx.Request] = []
 
@@ -31,7 +31,7 @@ def test_worker_client_heartbeats_provisioned_workspace_worker() -> None:
     )
 
     assert [(request.method, request.url.path) for request in requests] == [
-        ('POST', '/api/v1/workers/worker-1/heartbeat'),
+        ('POST', '/api/v1/workers/instances/worker-1/heartbeat'),
     ]
     assert all(
         request.headers['X-Project-ID'] == 'project-1'
@@ -43,18 +43,18 @@ def test_worker_client_heartbeats_provisioned_workspace_worker() -> None:
     )
 
 
-def test_worker_client_provisions_detected_harnesses() -> None:
-    """Initial provisioning submits User, Project, and local Harness capabilities."""
+def test_worker_client_registers_global_worker_with_detected_harnesses() -> None:
+    """Global Worker registration submits its initial Project and Harnesses."""
 
     def handler(request: httpx.Request) -> httpx.Response:
         """Validate one worker registration and return its generated ID."""
 
         assert request.method == 'POST'
-        assert request.url.path == '/api/v1/workers'
+        assert request.url.path == '/api/v1/workers/instances'
         assert request.headers['X-Project-ID'] == 'project-1'
         assert request.headers['X-User-ID'] == 'user-1'
         assert request.read() == (
-            b'{"harnesses":[{"kind":"louie","version":"v1","config":{}},'
+            b'{"project_id":"project-1","harnesses":[{"kind":"louie","version":"v1","config":{}},'
             b'{"kind":"codex_cli","version":"v1","config":{}}]}'
         )
         return httpx.Response(201, json={'id': 'worker-1'})

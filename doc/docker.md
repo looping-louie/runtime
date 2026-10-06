@@ -58,8 +58,9 @@ Repeated `--harness` flags declare multiple capabilities, such as
 After the first start, the runtime reuses the existing configuration and
 ignores these initialization flags. Change configuration by editing or removing
 `config/runtime.json`; never mount that file individually. The runtime
-registers missing workers and atomically writes the generated `worker_id` to
-the mounted configuration directory.
+registers one global Worker, atomically writes its generated `worker_id` to the
+mounted configuration directory, and safely enables every configured Project
+on each start.
 
 The `--user` option makes files created in the mounted configuration directory
 and checkout belong to the current host user.

@@ -30,11 +30,11 @@ def config_payload(checkout_path: Path | str = '/checkout') -> dict[str, object]
     return {
         'api_base_url': 'http://127.0.0.1:8000/api/v1',
         'user_id': 'user-local',
+        'worker_id': 'worker-1',
         'poll_interval_seconds': 2,
         'harnesses': [{'kind': 'louie'}],
         'projects': [{
             'project_id': 'project-local',
-            'worker_id': 'worker-1',
             'repository_path': str(checkout_path),
         }],
     }
@@ -58,7 +58,7 @@ def test_load_config_resolves_workspace_checkout(tmp_path: Path) -> None:
     assert config.harness_kinds == ('louie', 'codex_cli')
     assert config.harness_binaries == {'codex_cli': 'codex'}
     assert config.checkout_for('project-local').repository_path == checkout_path
-    assert config.checkout_for('project-local').worker_id == 'worker-1'
+    assert config.require_worker_id() == 'worker-1'
 
 
 def test_load_config_rejects_duplicate_workspace_mapping(tmp_path: Path) -> None:
@@ -66,8 +66,8 @@ def test_load_config_rejects_duplicate_workspace_mapping(tmp_path: Path) -> None
 
     payload = config_payload()
     payload['projects'] = [
-        {'project_id': 'project-local', 'worker_id': 'worker-1', 'repository_path': '/first'},
-        {'project_id': 'project-local', 'worker_id': 'worker-2', 'repository_path': '/second'},
+        {'project_id': 'project-local', 'repository_path': '/first'},
+        {'project_id': 'project-local', 'repository_path': '/second'},
     ]
 
     with pytest.raises(ValueError, match='duplicate project_id'):
@@ -164,20 +164,18 @@ def test_validate_checkouts_accepts_clean_git_repository(tmp_path: Path) -> None
     config.validate_checkouts()
 
 
-def test_persist_worker_id_completes_initial_project_provisioning(tmp_path: Path) -> None:
-    """An API-generated worker ID is stored for subsequent runtime starts."""
+def test_persist_worker_id_completes_global_worker_provisioning(tmp_path: Path) -> None:
+    """An API-generated Worker ID is stored for subsequent runtime starts."""
 
     payload = config_payload()
-    project = payload['projects'][0]
-    assert isinstance(project, dict)
-    project.pop('worker_id')
+    payload.pop('worker_id')
     path = write_config(tmp_path, payload)
 
-    assert load_config(path).checkout_for('project-local').worker_id is None
+    assert load_config(path).worker_id is None
 
-    persist_worker_id(path, project_id='project-local', worker_id='worker-1')
+    persist_worker_id(path, worker_id='worker-1')
 
-    assert load_config(path).checkout_for('project-local').worker_id == 'worker-1'
+    assert load_config(path).require_worker_id() == 'worker-1'
 
 
 def test_initialize_config_creates_a_first_start_configuration(tmp_path: Path) -> None:

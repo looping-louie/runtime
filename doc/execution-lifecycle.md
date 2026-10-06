@@ -12,7 +12,7 @@ performs API-directed checkpoint actions in that checkout. Its responsibilities
 are:
 
 - Polling configured projects and claiming at most one run per project.
-- Provisioning each missing worker once with locally detected Harnesses.
+- Registering one global Worker and enabling it for every configured Project.
 - Re-detecting local Harness health and reporting the current set on heartbeat.
 - Renewing the active Pipeline lease before every state-changing checkpoint.
 - Collecting bounded repository context.
@@ -36,19 +36,21 @@ local storage.
 
 ## Worker Provisioning And Polling
 
-For a project mapping without `worker_id`, the runtime checks the configured
+When the top-level `worker_id` is absent, the runtime checks the configured
 Codex executable and local login, and checks the configured Copilot executable
 with `--version`. It always supports `louie`; it adds `codex_cli` only when both
 Codex checks succeed and adds `copilot_cli` when the Copilot check succeeds.
-The project is then registered through `POST /workers`, and the returned ID is
-persisted immediately in the runtime JSON. Later starts reuse that ID and follow
-the existing heartbeat and polling flow. During polling, a shared detector
-refreshes at most every 30 seconds and each project heartbeat replaces the API's
-observed Harness set. Consequently a queued Codex run becomes claimable after a
-successful local login without reprovisioning the worker or recreating the run.
-The runtime does not enumerate CLI models; the API freezes the requested model
-and the CLI determines whether that authenticated account accepts it. All API
-requests carry the configured `X-User-ID` and project-specific `X-Project-ID`.
+The runtime registers one Worker through `POST /workers/instances` using its
+first configured Project, then persists the returned ID immediately in the
+runtime JSON before enabling every configured Project. Later starts reuse that
+ID and reconcile the idempotent enablements. During polling, a shared detector
+refreshes at most every 30 seconds and one Worker heartbeat replaces the API's
+observed Harness set before the runtime claims work in each enabled Project.
+Consequently a queued Codex run becomes claimable after a successful local login
+without recreating the Worker or Pipeline run. The runtime does not enumerate
+CLI models; the API freezes the requested model and the CLI determines whether
+that authenticated account accepts it. All API requests carry the configured
+`X-User-ID` and project-specific `X-Project-ID`.
 
 ## Local execution sequence
 
