@@ -19,11 +19,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml ./
-COPY assets/config/runtime.json.tpl /app/runtime.json.tpl
+COPY assets/config/runtime.json.tpl /app/assets/runtime.json.tpl
 COPY src ./src
 
-RUN grep -v '^[[:space:]]*#' /app/runtime.json.tpl > /app/default-runtime.json \
+RUN grep -v '^[[:space:]]*#' /app/assets/runtime.json.tpl > /app/assets/default-runtime.json \
     && pip install --no-cache-dir .
 
 ENTRYPOINT ["looping-louie-runtime"]
-CMD ["--config", "/runtime-config/runtime.json"]
+CMD ["--config", "/app/config/runtime.json"]

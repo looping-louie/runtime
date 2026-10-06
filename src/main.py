@@ -18,7 +18,7 @@ from provisioning import provision_missing_workers
 from runs.executor import ActivityExecutor
 
 
-DEFAULT_DOCKER_CONFIG = Path('/app/default-runtime.json')
+DEFAULT_DOCKER_CONFIG = Path('/app/assets/default-runtime.json')
 
 
 def main() -> None:

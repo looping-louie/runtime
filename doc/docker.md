@@ -25,19 +25,19 @@ available. Use `[]` for a connected worker that must not receive Harness work.
 
 ## Start the runtime
 
-The image creates `/runtime-config/runtime.json` during its first start from
+The image creates `/app/config/runtime.json` during its first start from
 the shared [configuration template](../assets/config/runtime.json.tpl). Mount a
 writable configuration directory and each Git checkout the worker manages:
 
 ```sh
 export REPO_PATH=/absolute/path/to/checkout
-export CONFIG_PATH="$PWD/runtime-config"
+export CONFIG_PATH="$PWD/config"
 mkdir -p "$CONFIG_PATH"
 
 docker run --rm \
   --user "$(id -u):$(id -g)" \
   --add-host host.docker.internal:host-gateway \
-  -v "$CONFIG_PATH:/runtime-config" \
+  -v "$CONFIG_PATH:/app/config" \
   -v "$REPO_PATH:/workspaces/project" \
   looping-louie-runtime:latest \
   --api-base-url http://host.docker.internal:2000/api/v1 \
@@ -47,14 +47,14 @@ docker run --rm \
   --harness louie
 ```
 
-The image has a default `--config /runtime-config/runtime.json` command. The
+The image has a default `--config /app/config/runtime.json` command. The
 first-start flags create that file from image defaults with the supplied API,
 User, Project, checkout, and Harness values. Repeated `--harness` flags declare
 multiple capabilities, such as `--harness codex_cli --harness copilot_cli`.
 
 After the first start, the runtime reuses the existing configuration and
 ignores these initialization flags. Change configuration by editing or removing
-`runtime-config/runtime.json`; never mount that file individually. The runtime
+`config/runtime.json`; never mount that file individually. The runtime
 registers missing workers and atomically writes the generated `worker_id` to
 the mounted configuration directory.
 
