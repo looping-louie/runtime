@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from urllib.parse import quote
 
 import httpx
@@ -26,12 +27,15 @@ class PipelineRunClaimClient(RuntimeApiClient):
                 project_id=project_id,
                 pipeline_id=pipeline_id,
             ):
-                claim = self._claim_candidate(
-                    project_id=project_id,
-                    pipeline_id=pipeline_id,
-                    candidate=candidate,
-                    worker_id=worker_id,
-                )
+                try:
+                    claim = self._claim_candidate(
+                        project_id=project_id,
+                        pipeline_id=pipeline_id,
+                        candidate=candidate,
+                        worker_id=worker_id,
+                    )
+                except WorkerCapacityUnavailableError:
+                    return None
                 if claim is not None:
                     return claim
         return None
@@ -90,8 +94,14 @@ class PipelineRunClaimClient(RuntimeApiClient):
             operation='Runtime claim',
             payload={'worker_id': worker_id, 'status': 'claimed'},
             headers={'If-Match': etag},
-            accepted_error_statuses=(httpx.codes.PRECONDITION_FAILED,),
+            accepted_error_statuses=(
+                httpx.codes.CONFLICT,
+                httpx.codes.PRECONDITION_FAILED,
+            ),
         )
+        if response.status_code == httpx.codes.CONFLICT:
+            _require_worker_capacity_error(response)
+            raise WorkerCapacityUnavailableError
         if response.status_code == httpx.codes.PRECONDITION_FAILED:
             return None
         return self._to_claim(response.json(), project_id=project_id)
@@ -158,6 +168,24 @@ class PipelineRunClaimClient(RuntimeApiClient):
             lease_token=lease_token,
             payload=run,
         )
+
+
+class WorkerCapacityUnavailableError(Exception):
+    """Stop Project claim attempts after the global Worker reaches capacity."""
+
+
+def _require_worker_capacity_error(response: httpx.Response) -> None:
+    """Reject unrelated claim conflicts that should remain runtime failures."""
+
+    try:
+        value = response.json()
+    except json.JSONDecodeError as error:
+        raise RuntimeError('Runtime claim conflict response must be JSON.') from error
+    if not isinstance(value, dict):
+        raise RuntimeError('Runtime claim conflict response must be a JSON object.')
+    error = value.get('error')
+    if not isinstance(error, dict) or error.get('code') != 'worker_capacity_unavailable':
+        raise RuntimeError('Runtime claim conflict is not Worker capacity saturation.')
 
 
 def _require_text(value: dict[str, object], field_name: str) -> str:

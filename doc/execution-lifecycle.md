@@ -61,6 +61,12 @@ at a time. The API returns the current Activity child and a lease token. The
 runtime renews that lease before state-changing checkpoints and Pipeline
 continuation; a rejected renewal stops work for that claim.
 
+A global Worker currently has capacity for one active lease across all enabled
+Projects. When the API rejects a claim with `worker_capacity_unavailable`, the
+runtime leaves that Project idle for the poll cycle and continues polling its
+other configured Projects. It retries the Project in the next cycle after the
+active lease completes or expires.
+
 Human `approval` and `quiz` Activities do not have a runtime execution path.
 They wait for a person to submit a decision through the API.
 

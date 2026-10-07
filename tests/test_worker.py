@@ -91,6 +91,44 @@ def test_run_once_executes_claim_in_its_mapped_checkout(tmp_path: Path) -> None:
     assert executions == [(claim, first_checkout)]
 
 
+def test_run_once_continues_after_a_project_has_no_worker_capacity(
+    tmp_path: Path,
+) -> None:
+    """Capacity backpressure in one Project does not block another Project."""
+
+    first_checkout = tmp_path / 'first'
+    second_checkout = tmp_path / 'second'
+    claim = ClaimedPipelineRun(
+        project_id='project-2', pipeline_id='pipeline-2', run_id='run-2',
+        lease_token='lease-2', payload={'id': 'run-2'},
+    )
+    client = FakeClaimClient({'project-1': None, 'project-2': claim})
+    executions: list[tuple[ClaimedPipelineRun, Path]] = []
+    worker = RuntimeWorker(
+        config=RuntimeConfig(
+            api_base_url='http://127.0.0.1:8000/api/v1',
+            user_id='user-1',
+            worker_id='worker-1',
+            poll_interval_seconds=1,
+            harnesses=(HarnessConfig(kind='louie'),),
+            projects=(
+                ProjectCheckout('project-1', first_checkout),
+                ProjectCheckout('project-2', second_checkout),
+            ),
+        ),
+        claim_client=client,
+        execute_claim=lambda received_claim, checkout: executions.append(
+            (received_claim, checkout),
+        ),
+    )
+
+    claimed_count = worker.run_once()
+
+    assert claimed_count == 1
+    assert client.calls == [('project-1', 'worker-1'), ('project-2', 'worker-1')]
+    assert executions == [(claim, second_checkout)]
+
+
 def test_worker_heartbeats_one_global_worker_before_project_claims(
     tmp_path: Path,
 ) -> None:
