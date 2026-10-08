@@ -23,9 +23,9 @@
   # both binaries but starts with no declared Harnesses, preventing it from
   # claiming work before this machine is ready. An empty list receives no work.
   "harnesses": [],
-  # Each worker maps API projects to local repository checkouts. This keeps a
-  # worker from executing a task in an arbitrary directory supplied by an API
-  # run.
+  # This runtime maps API projects to local repository checkouts. This keeps
+  # the Worker from executing a task in an arbitrary directory supplied by an
+  # API run.
   "projects": [
     {
       # Replace with the Project ID created in the dashboard or via API

@@ -121,6 +121,46 @@ def test_claim_next_continues_after_another_worker_wins() -> None:
     assert patch_count == 2
 
 
+def test_claim_next_stops_when_the_global_worker_is_at_capacity() -> None:
+    """Capacity saturation leaves the selected Project idle without an error."""
+
+    patch_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        """Offer two candidates but reject the first claim for capacity."""
+
+        nonlocal patch_count
+        if request.url.path == '/api/v1/pipelines':
+            return httpx.Response(200, json={'items': [{'id': 'pipeline-1'}], 'total': 1})
+        if request.method == 'GET':
+            return httpx.Response(
+                200,
+                json={
+                    'items': [
+                        {'etag': '"run-1-v1"', 'run': {'id': 'run-1'}},
+                        {'etag': '"run-2-v1"', 'run': {'id': 'run-2'}},
+                    ],
+                    'total': 2,
+                },
+            )
+        patch_count += 1
+        return httpx.Response(
+            409,
+            json={'error': {'code': 'worker_capacity_unavailable'}},
+        )
+
+    client = PipelineRunClaimClient(
+        api_base_url='https://api.example/api/v1',
+        user_id='user-1',
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    claim = client.claim_next(project_id='project-1', worker_id='worker-1')
+
+    assert claim is None
+    assert patch_count == 1
+
+
 def _claim_response(run_id: str = 'run-1') -> dict[str, object]:
     """Build one successful Pipeline claim response."""
 

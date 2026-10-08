@@ -18,17 +18,7 @@ class ProjectCheckout:
     """One API project and the checkout a runtime may execute within."""
 
     project_id: str
-    worker_id: str | None
     repository_path: Path
-
-    def require_worker_id(self) -> str:
-        """Return the persisted worker identity after initial provisioning."""
-
-        if self.worker_id is None:
-            raise ValueError(
-                f'Project {self.project_id!r} has not been provisioned with a worker_id.'
-            )
-        return self.worker_id
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +35,7 @@ class RuntimeConfig:
 
     api_base_url: str
     user_id: str
+    worker_id: str | None
     poll_interval_seconds: float
     harnesses: tuple[HarnessConfig, ...]
     projects: tuple[ProjectCheckout, ...]
@@ -72,6 +63,13 @@ class RuntimeConfig:
             if project.project_id == project_id:
                 return project
         raise ValueError(f'No checkout is configured for project {project_id!r}.')
+
+    def require_worker_id(self) -> str:
+        """Return the Worker identity after initial registration."""
+
+        if self.worker_id is None:
+            raise ValueError('Runtime has not been provisioned with a worker_id.')
+        return self.worker_id
 
     def validate_checkouts(self) -> None:
         """Require every configured checkout to be an existing Git repository."""
@@ -108,12 +106,16 @@ def load_config(path: str | Path) -> RuntimeConfig:
         raise ValueError('Runtime configuration must be a JSON object.')
     _reject_unknown_fields(
         raw,
-        {'api_base_url', 'user_id', 'poll_interval_seconds', 'harnesses', 'projects'},
+        {
+            'api_base_url', 'user_id', 'worker_id', 'poll_interval_seconds',
+            'harnesses', 'projects',
+        },
         'Runtime configuration',
     )
     return RuntimeConfig(
         api_base_url=_require_http_url(raw.get('api_base_url'), 'api_base_url'),
         user_id=_require_text(raw.get('user_id'), 'user_id'),
+        worker_id=_optional_text(raw.get('worker_id'), 'worker_id'),
         poll_interval_seconds=_require_positive_number(
             raw.get('poll_interval_seconds'), 'poll_interval_seconds',
         ),
@@ -180,7 +182,7 @@ def _parse_projects(value: object) -> tuple[ProjectCheckout, ...]:
             raise ValueError(f'projects[{index}] must be an object.')
         _reject_unknown_fields(
             item,
-            {'project_id', 'worker_id', 'repository_path'},
+            {'project_id', 'repository_path'},
             f'projects[{index}]',
         )
         project_id = _require_text(item.get('project_id'), f'projects[{index}].project_id')
@@ -190,9 +192,6 @@ def _parse_projects(value: object) -> tuple[ProjectCheckout, ...]:
         projects.append(
             ProjectCheckout(
                 project_id=project_id,
-                worker_id=_optional_text(
-                    item.get('worker_id'), f'projects[{index}].worker_id',
-                ),
                 repository_path=Path(
                     _require_text(
                         item.get('repository_path'),
@@ -241,28 +240,18 @@ def _parse_harnesses(value: object) -> tuple[HarnessConfig, ...]:
 def persist_worker_id(
     path: str | Path,
     *,
-    project_id: str,
     worker_id: str,
 ) -> None:
-    """Atomically persist one API-generated worker ID in the runtime JSON file."""
+    """Atomically persist one API-generated Worker ID in runtime JSON."""
 
     config_path = Path(path)
     raw = _read_json_object(config_path)
-    projects = raw.get('projects')
-    if not isinstance(projects, list):
-        raise ValueError('projects must be an array before worker provisioning.')
     normalized_worker_id = _require_text(worker_id, 'worker_id')
-    for item in projects:
-        if isinstance(item, dict) and item.get('project_id') == project_id:
-            existing = item.get('worker_id')
-            if existing not in (None, normalized_worker_id):
-                raise ValueError(
-                    f'Project {project_id!r} already has a different worker_id.'
-                )
-            item['worker_id'] = normalized_worker_id
-            _atomic_write_json(config_path, raw)
-            return
-    raise ValueError(f'Project {project_id!r} is absent from runtime configuration.')
+    existing = raw.get('worker_id')
+    if existing not in (None, normalized_worker_id):
+        raise ValueError('Runtime already has a different worker_id.')
+    raw['worker_id'] = normalized_worker_id
+    _atomic_write_json(config_path, raw)
 
 
 def _read_json_object(path: Path) -> dict[str, Any]:

@@ -32,11 +32,10 @@ class WorkerHeartbeatClient(Protocol):
     def heartbeat(
         self,
         *,
-        project_id: str,
         worker_id: str,
         harnesses: tuple[str, ...],
     ) -> None:
-        """Record one worker liveness heartbeat."""
+        """Record one Worker liveness heartbeat."""
 
 
 class RuntimeWorker:
@@ -64,15 +63,18 @@ class RuntimeWorker:
 
         claimed_count = 0
         harnesses = self._harness_capabilities()
+        worker_id = self._config.require_worker_id()
+        if self._heartbeat_client is not None:
+            try:
+                self._heartbeat_client.heartbeat(
+                    worker_id=worker_id,
+                    harnesses=harnesses,
+                )
+            except RuntimeError:
+                LOGGER.exception('Runtime Worker heartbeat failed; skipping this poll cycle.')
+                return claimed_count
         for project in self._config.projects:
             try:
-                worker_id = project.require_worker_id()
-                if self._heartbeat_client is not None:
-                    self._heartbeat_client.heartbeat(
-                        project_id=project.project_id,
-                        worker_id=worker_id,
-                        harnesses=harnesses,
-                    )
                 claim = self._claim_client.claim_next(
                     project_id=project.project_id,
                     worker_id=worker_id,

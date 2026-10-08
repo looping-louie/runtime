@@ -14,7 +14,7 @@ from harnesses.capabilities import validate_harness_capabilities
 from harnesses.executor import execute_harness
 from polling.loop import run_forever
 from polling.worker import RuntimeWorker
-from provisioning import provision_missing_workers
+from provisioning import provision_worker
 from runs.executor import ActivityExecutor
 
 
@@ -89,13 +89,12 @@ def main() -> None:
         api_base_url=config.api_base_url,
         user_id=config.user_id,
     )
-    if any(project.worker_id is None for project in config.projects):
-        config = provision_missing_workers(
-            config_path=arguments.config,
-            config=config,
-            client=worker_client,
-            harnesses=config.harness_kinds,
-        )
+    config = provision_worker(
+        config_path=arguments.config,
+        config=config,
+        client=worker_client,
+        harnesses=config.harness_kinds,
+    )
     activity_client = ActivityRunClient(
         api_base_url=config.api_base_url,
         user_id=config.user_id,

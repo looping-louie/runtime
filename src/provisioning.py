@@ -19,29 +19,31 @@ class WorkerProvisioningClient(Protocol):
     ) -> str:
         """Create one worker and return its API-generated ID."""
 
+    def enable_project(self, *, worker_id: str, project_id: str) -> None:
+        """Enable one worker to claim work for one Project."""
 
-def provision_missing_workers(
+
+def provision_worker(
     *,
     config_path: str | Path,
     config: RuntimeConfig,
     client: WorkerProvisioningClient,
     harnesses: tuple[str, ...],
 ) -> RuntimeConfig:
-    """Provision missing workers once and persist every API-generated ID."""
+    """Register one Worker and reconcile its Project enablements."""
 
     prepared = config
-    for project in prepared.projects:
-        if project.worker_id is not None:
-            continue
+    if prepared.worker_id is None:
         worker_id = client.provision(
-            project_id=project.project_id,
+            project_id=prepared.projects[0].project_id,
             harnesses=harnesses,
         )
-        # Persist each successful registration before another remote call can fail.
         persist_worker_id(
             config_path,
-            project_id=project.project_id,
             worker_id=worker_id,
         )
         prepared = load_config(config_path)
+    worker_id = prepared.require_worker_id()
+    for project in prepared.projects:
+        client.enable_project(worker_id=worker_id, project_id=project.project_id)
     return prepared
