@@ -51,7 +51,9 @@ A full `runtime.json` configuration file should resemble something like this:
   "user_id": "local-user",
   "poll_interval_seconds": 2,
   "harnesses": [
-    { "kind": "louie" }
+    {
+      "kind": "louie"
+    }
   ],
   "projects": [
     {
@@ -79,7 +81,7 @@ looping-louie-runtime --config runtime.json
 ```
 
 On the first normal start, the runtime registers one global Worker through
-`POST /api/v1/workers/instances`; its API-generated ID is written to the top
+`POST /api/v1/workers`; its API-generated ID is written to the top
 level of `runtime.json` immediately. Every configured Project is then enabled
 for that Worker. Later starts reuse the ID and safely reconcile the same
 Project enablements. Do not add `worker_id` yourself.
@@ -96,9 +98,8 @@ Pipeline and Activity checkpoint behavior is documented in
 ### Harness configuration and availability
 
 The required `harnesses` list in `runtime.json` declares every Harness the
-runtime is allowed to execute and publish to the API. Each declaration has a
-required `kind`: `louie`, `codex_cli`, or `copilot_cli`. An empty list keeps
-the worker connected but unable to claim Harness work. The
+runtime is allowed to execute and publish to the API (an empty list keeps
+the worker connected but unable to claim Harness work). The
 [configuration template](assets/config/runtime.json.tpl) documents every
 available field.
 

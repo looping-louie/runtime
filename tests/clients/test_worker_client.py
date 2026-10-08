@@ -31,7 +31,7 @@ def test_worker_client_heartbeats_global_worker() -> None:
     )
 
     assert [(request.method, request.url.path) for request in requests] == [
-        ('POST', '/api/v1/workers/instances/worker-1/heartbeat'),
+        ('POST', '/api/v1/workers/worker-1/heartbeat'),
     ]
     assert all(
         request.headers['X-Project-ID'] == 'project-1'
@@ -50,7 +50,7 @@ def test_worker_client_registers_global_worker_with_detected_harnesses() -> None
         """Validate one worker registration and return its generated ID."""
 
         assert request.method == 'POST'
-        assert request.url.path == '/api/v1/workers/instances'
+        assert request.url.path == '/api/v1/workers'
         assert request.headers['X-Project-ID'] == 'project-1'
         assert request.headers['X-User-ID'] == 'user-1'
         assert request.read() == (

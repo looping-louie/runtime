@@ -40,7 +40,7 @@ When the top-level `worker_id` is absent, the runtime checks the configured
 Codex executable and local login, and checks the configured Copilot executable
 with `--version`. It always supports `louie`; it adds `codex_cli` only when both
 Codex checks succeed and adds `copilot_cli` when the Copilot check succeeds.
-The runtime registers one Worker through `POST /workers/instances` using its
+The runtime registers one Worker through `POST /workers` using its
 first configured Project, then persists the returned ID immediately in the
 runtime JSON before enabling every configured Project. Later starts reuse that
 ID and reconcile the idempotent enablements. During polling, a shared detector

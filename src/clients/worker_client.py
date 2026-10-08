@@ -21,7 +21,7 @@ class WorkerHeartbeatClient(RuntimeApiClient):
         response = self._request_object(
             method='POST',
             project_id=project_id,
-            path='/workers/instances',
+            path='/workers',
             operation='Worker lifecycle',
             object_error='Worker lifecycle response must be a JSON object.',
             payload={
@@ -41,7 +41,7 @@ class WorkerHeartbeatClient(RuntimeApiClient):
             method='POST',
             project_id=project_id,
             path=(
-                f'/workers/instances/{quote(worker_id, safe="")}/projects/'
+                f'/workers/{quote(worker_id, safe="")}/projects/'
                 f'{quote(project_id, safe="")}'
             ),
             operation='Worker lifecycle',
@@ -61,7 +61,7 @@ class WorkerHeartbeatClient(RuntimeApiClient):
         self._request_object(
             method='POST',
             project_id=project_id,
-            path=f'/workers/instances/{quote(worker_id, safe="")}/heartbeat',
+            path=f'/workers/{quote(worker_id, safe="")}/heartbeat',
             operation='Worker lifecycle',
             object_error='Worker lifecycle response must be a JSON object.',
             payload=_capability_payload(harnesses),
