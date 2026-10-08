@@ -30,7 +30,7 @@ def provision_worker(
     client: WorkerProvisioningClient,
     harnesses: tuple[str, ...],
 ) -> RuntimeConfig:
-    """Register one global Worker and reconcile its Project enablements."""
+    """Register one Worker and reconcile its Project enablements."""
 
     prepared = config
     if prepared.worker_id is None:

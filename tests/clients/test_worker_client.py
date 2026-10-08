@@ -8,7 +8,7 @@ from clients.worker_client import WorkerHeartbeatClient
 
 
 def test_worker_client_heartbeats_global_worker() -> None:
-    """Global Worker heartbeat selects a Project only for API authorization."""
+    """Worker heartbeat selects a Project only for API authorization."""
 
     requests: list[httpx.Request] = []
 
@@ -44,7 +44,7 @@ def test_worker_client_heartbeats_global_worker() -> None:
 
 
 def test_worker_client_registers_global_worker_with_detected_harnesses() -> None:
-    """Global Worker registration submits its initial Project and Harnesses."""
+    """Worker registration submits its initial Project and Harnesses."""
 
     def handler(request: httpx.Request) -> httpx.Response:
         """Validate one worker registration and return its generated ID."""

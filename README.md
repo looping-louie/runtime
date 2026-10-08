@@ -80,7 +80,7 @@ Start the worker from a normal terminal:
 looping-louie-runtime --config runtime.json
 ```
 
-On the first normal start, the runtime registers one global Worker through
+On the first normal start, the runtime registers one Worker through
 `POST /api/v1/workers`; its API-generated ID is written to the top
 level of `runtime.json` immediately. Every configured Project is then enabled
 for that Worker. Later starts reuse the ID and safely reconcile the same

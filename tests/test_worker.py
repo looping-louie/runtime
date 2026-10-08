@@ -48,7 +48,7 @@ class FakeHeartbeatClient:
         worker_id: str,
         harnesses: tuple[str, ...],
     ) -> None:
-        """Record one global Worker heartbeat request."""
+        """Record one Worker heartbeat request."""
 
         self.heartbeats.append((project_id, worker_id, harnesses))
 

@@ -65,7 +65,7 @@ class RuntimeConfig:
         raise ValueError(f'No checkout is configured for project {project_id!r}.')
 
     def require_worker_id(self) -> str:
-        """Return the global Worker identity after initial registration."""
+        """Return the Worker identity after initial registration."""
 
         if self.worker_id is None:
             raise ValueError('Runtime has not been provisioned with a worker_id.')
@@ -242,7 +242,7 @@ def persist_worker_id(
     *,
     worker_id: str,
 ) -> None:
-    """Atomically persist one API-generated global Worker ID in runtime JSON."""
+    """Atomically persist one API-generated Worker ID in runtime JSON."""
 
     config_path = Path(path)
     raw = _read_json_object(config_path)

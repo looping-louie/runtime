@@ -12,7 +12,7 @@ performs API-directed checkpoint actions in that checkout. Its responsibilities
 are:
 
 - Polling configured projects and claiming at most one run per project.
-- Registering one global Worker and enabling it for every configured Project.
+- Registering one Worker and enabling it for every configured Project.
 - Re-detecting local Harness health and reporting the current set on heartbeat.
 - Renewing the active Pipeline lease before every state-changing checkpoint.
 - Collecting bounded repository context.
@@ -61,7 +61,7 @@ at a time. The API returns the current Activity child and a lease token. The
 runtime renews that lease before state-changing checkpoints and Pipeline
 continuation; a rejected renewal stops work for that claim.
 
-A global Worker currently has capacity for one active lease across all enabled
+A Worker currently has capacity for one active lease across all enabled
 Projects. When the API rejects a claim with `worker_capacity_unavailable`, the
 runtime leaves that Project idle for the poll cycle and continues polling its
 other configured Projects. It retries the Project in the next cycle after the

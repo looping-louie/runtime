@@ -171,7 +171,7 @@ class PipelineRunClaimClient(RuntimeApiClient):
 
 
 class WorkerCapacityUnavailableError(Exception):
-    """Stop Project claim attempts after the global Worker reaches capacity."""
+    """Stop Project claim attempts after the Worker reaches capacity."""
 
 
 def _require_worker_capacity_error(response: httpx.Response) -> None:

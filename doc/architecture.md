@@ -74,7 +74,7 @@ tests/
 ## Composition
 
 `main.py` is the composition root. It loads and validates `RuntimeConfig`,
-constructs the cached local-Harness detector, registers the global Worker,
+constructs the cached local-Harness detector, registers the Worker,
 creates the HTTP clients, passes them to `ActivityExecutor`, and constructs
 `RuntimeWorker` with the executor callback and capability supplier. It then
 invokes `run_forever`.

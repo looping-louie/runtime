@@ -8,7 +8,7 @@ from clients.api_client import RuntimeApiClient
 
 
 class WorkerHeartbeatClient(RuntimeApiClient):
-    """Register global Workers, enable Projects, and refresh API liveness."""
+    """Register Workers, enable Projects, and refresh API liveness."""
 
     def provision(
         self,
@@ -16,7 +16,7 @@ class WorkerHeartbeatClient(RuntimeApiClient):
         project_id: str,
         harnesses: tuple[str, ...],
     ) -> str:
-        """Register one global Worker and return its API-generated ID."""
+        """Register one Worker and return its API-generated ID."""
 
         response = self._request_object(
             method='POST',
@@ -31,11 +31,11 @@ class WorkerHeartbeatClient(RuntimeApiClient):
         )
         worker_id = response.get('id')
         if not isinstance(worker_id, str) or not worker_id:
-            raise RuntimeError('Global Worker registration response is missing its ID.')
+            raise RuntimeError('Worker registration response is missing its ID.')
         return worker_id
 
     def enable_project(self, *, worker_id: str, project_id: str) -> None:
-        """Enable one global Worker to claim work for one Project."""
+        """Enable one Worker to claim work for one Project."""
 
         self._request_object(
             method='POST',

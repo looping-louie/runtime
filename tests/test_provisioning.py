@@ -36,7 +36,7 @@ class FakeWorkerClient:
 
 
 def test_provision_worker_persists_one_id_and_enables_every_project(tmp_path: Path) -> None:
-    """A global Worker is created once and reconciles every Project assignment."""
+    """A Worker is created once and reconciles every Project assignment."""
 
     config_path = _write_config(tmp_path, worker_id=None)
     client = FakeWorkerClient()

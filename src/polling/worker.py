@@ -36,7 +36,7 @@ class WorkerHeartbeatClient(Protocol):
         worker_id: str,
         harnesses: tuple[str, ...],
     ) -> None:
-        """Record one global Worker liveness heartbeat."""
+        """Record one Worker liveness heartbeat."""
 
 
 class RuntimeWorker:
