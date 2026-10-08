@@ -8,7 +8,7 @@ from clients.worker_client import WorkerHeartbeatClient
 
 
 def test_worker_client_heartbeats_global_worker() -> None:
-    """Worker heartbeat selects a Project only for API authorization."""
+    """Worker heartbeat authenticates as the Worker owner."""
 
     requests: list[httpx.Request] = []
 
@@ -25,7 +25,6 @@ def test_worker_client_heartbeats_global_worker() -> None:
     )
 
     client.heartbeat(
-        project_id='project-1',
         worker_id='worker-1',
         harnesses=('louie',),
     )
@@ -33,10 +32,7 @@ def test_worker_client_heartbeats_global_worker() -> None:
     assert [(request.method, request.url.path) for request in requests] == [
         ('POST', '/api/v1/workers/worker-1/heartbeat'),
     ]
-    assert all(
-        request.headers['X-Project-ID'] == 'project-1'
-        for request in requests
-    )
+    assert all('X-Project-ID' not in request.headers for request in requests)
     assert all(request.headers['X-User-ID'] == 'user-1' for request in requests)
     assert requests[0].read() == (
         b'{"harnesses":[{"kind":"louie","version":"v1","config":{}}]}'

@@ -50,7 +50,7 @@ Consequently a queued Codex run becomes claimable after a successful local login
 without recreating the Worker or Pipeline run. The runtime does not enumerate
 CLI models; the API freezes the requested model and the CLI determines whether
 that authenticated account accepts it. All API requests carry the configured
-`X-User-ID` and project-specific `X-Project-ID`.
+`X-User-ID`; Project-scoped requests also carry `X-Project-ID`.
 
 ## Local execution sequence
 

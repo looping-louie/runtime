@@ -32,7 +32,6 @@ class WorkerHeartbeatClient(Protocol):
     def heartbeat(
         self,
         *,
-        project_id: str,
         worker_id: str,
         harnesses: tuple[str, ...],
     ) -> None:
@@ -68,7 +67,6 @@ class RuntimeWorker:
         if self._heartbeat_client is not None:
             try:
                 self._heartbeat_client.heartbeat(
-                    project_id=self._config.projects[0].project_id,
                     worker_id=worker_id,
                     harnesses=harnesses,
                 )

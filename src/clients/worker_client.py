@@ -52,7 +52,6 @@ class WorkerHeartbeatClient(RuntimeApiClient):
     def heartbeat(
         self,
         *,
-        project_id: str,
         worker_id: str,
         harnesses: tuple[str, ...],
     ) -> None:
@@ -60,7 +59,6 @@ class WorkerHeartbeatClient(RuntimeApiClient):
 
         self._request_object(
             method='POST',
-            project_id=project_id,
             path=f'/workers/{quote(worker_id, safe="")}/heartbeat',
             operation='Worker lifecycle',
             object_error='Worker lifecycle response must be a JSON object.',

@@ -39,18 +39,17 @@ class FakeHeartbeatClient:
     def __init__(self) -> None:
         """Initialize an empty heartbeat request log."""
 
-        self.heartbeats: list[tuple[str, str, tuple[str, ...]]] = []
+        self.heartbeats: list[tuple[str, tuple[str, ...]]] = []
 
     def heartbeat(
         self,
         *,
-        project_id: str,
         worker_id: str,
         harnesses: tuple[str, ...],
     ) -> None:
         """Record one Worker heartbeat request."""
 
-        self.heartbeats.append((project_id, worker_id, harnesses))
+        self.heartbeats.append((worker_id, harnesses))
 
 
 def test_run_once_executes_claim_in_its_mapped_checkout(tmp_path: Path) -> None:
@@ -160,7 +159,7 @@ def test_worker_heartbeats_one_global_worker_before_project_claims(
     worker.run_once()
 
     assert heartbeat_client.heartbeats == [
-        ('project-1', 'worker-1', ('louie', 'codex_cli')),
+        ('worker-1', ('louie', 'codex_cli')),
     ]
 
 
