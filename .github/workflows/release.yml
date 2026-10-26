@@ -33,7 +33,7 @@ jobs:
           package_version="$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")"
           test "${GITHUB_REF_NAME#v}" = "$package_version"
 
-  test:
+  test_source:
     runs-on: ubuntu-24.04
     needs: verify_revision
     steps:
@@ -51,9 +51,9 @@ jobs:
       - name: Run tests
         run: python -m pytest -q
 
-  publish:
+  publish_images:
     runs-on: ubuntu-24.04
-    needs: test
+    needs: test_source
     steps:
       - name: Check out revision source
         uses: actions/checkout@v5
@@ -89,11 +89,11 @@ jobs:
           tags: ${{ steps.generate-image-metadata.outputs.tags }}
           labels: ${{ steps.generate-image-metadata.outputs.labels }}
 
-  release:
+  create_release:
     runs-on: ubuntu-24.04
-    needs: publish
+    needs: publish_images
     steps:
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "$GITHUB_REF_NAME" --generate-notes --title "$GITHUB_REF_NAME"
+        run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --generate-notes --title "$GITHUB_REF_NAME"
