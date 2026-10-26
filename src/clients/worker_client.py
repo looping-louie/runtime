@@ -8,7 +8,7 @@ from clients.api_client import RuntimeApiClient
 
 
 class WorkerHeartbeatClient(RuntimeApiClient):
-    """Provision runtime workers and refresh their API liveness."""
+    """Register Workers, enable Projects, and refresh API liveness."""
 
     def provision(
         self,
@@ -16,7 +16,7 @@ class WorkerHeartbeatClient(RuntimeApiClient):
         project_id: str,
         harnesses: tuple[str, ...],
     ) -> str:
-        """Create one worker with detected capabilities and return its API ID."""
+        """Register one Worker and return its API-generated ID."""
 
         response = self._request_object(
             method='POST',
@@ -24,17 +24,34 @@ class WorkerHeartbeatClient(RuntimeApiClient):
             path='/workers',
             operation='Worker lifecycle',
             object_error='Worker lifecycle response must be a JSON object.',
-            payload=_capability_payload(harnesses),
+            payload={
+                'project_id': project_id,
+                **_capability_payload(harnesses),
+            },
         )
         worker_id = response.get('id')
         if not isinstance(worker_id, str) or not worker_id:
-            raise RuntimeError('Worker provisioning response is missing its ID.')
+            raise RuntimeError('Worker registration response is missing its ID.')
         return worker_id
+
+    def enable_project(self, *, worker_id: str, project_id: str) -> None:
+        """Enable one Worker to claim work for one Project."""
+
+        self._request_object(
+            method='POST',
+            project_id=project_id,
+            path=(
+                f'/workers/{quote(worker_id, safe="")}/projects/'
+                f'{quote(project_id, safe="")}'
+            ),
+            operation='Worker lifecycle',
+            object_error='Worker lifecycle response must be a JSON object.',
+            payload={},
+        )
 
     def heartbeat(
         self,
         *,
-        project_id: str,
         worker_id: str,
         harnesses: tuple[str, ...],
     ) -> None:
@@ -42,7 +59,6 @@ class WorkerHeartbeatClient(RuntimeApiClient):
 
         self._request_object(
             method='POST',
-            project_id=project_id,
             path=f'/workers/{quote(worker_id, safe="")}/heartbeat',
             operation='Worker lifecycle',
             object_error='Worker lifecycle response must be a JSON object.',

@@ -8,7 +8,7 @@ import httpx
 
 
 class RuntimeApiClient:
-    """Send project-scoped requests and normalize transport failures."""
+    """Send authenticated API requests and normalize transport failures."""
 
     request_timeout_seconds = 60.0
 
@@ -29,7 +29,7 @@ class RuntimeApiClient:
         self,
         *,
         method: str,
-        project_id: str,
+        project_id: str | None = None,
         path: str,
         operation: str,
         payload: dict[str, object] | None = None,
@@ -46,8 +46,12 @@ class RuntimeApiClient:
                 params=params,
                 json=payload,
                 headers={
-                    'X-Project-ID': project_id,
                     'X-User-ID': self._user_id,
+                    **(
+                        {'X-Project-ID': project_id}
+                        if project_id is not None
+                        else {}
+                    ),
                     **(headers or {}),
                 },
             )
@@ -64,7 +68,7 @@ class RuntimeApiClient:
         self,
         *,
         method: str,
-        project_id: str,
+        project_id: str | None = None,
         path: str,
         operation: str,
         object_error: str,

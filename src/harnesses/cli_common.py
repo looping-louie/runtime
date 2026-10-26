@@ -99,10 +99,6 @@ def build_prompt(
             'commit. Leave all changes in the working tree. The API and runtime '
             'own commit authorization and execution.'
         ),
-        (
-            'Completion contract:\nYour final response must be only this JSON '
-            f'object shape, without Markdown fences: {json.dumps(completion_shape)}'
-        ),
         f'Turn responsibility:\n{phase_instruction(phase)}',
         f'Loop turn:\n{json.dumps(phase_context, sort_keys=True)}',
         f'Task:\n{input_text.strip()}',
@@ -110,6 +106,10 @@ def build_prompt(
         f'Repository context:\n{payload.get("repo_context", "")}',
         f'Constitution:\n{payload.get("constitution", "")}',
         f'Project profile:\n{json.dumps(payload.get("project_profile", {}), sort_keys=True)}',
+        (
+            'Final response requirement:\nRespond only with this JSON object '
+            f'shape, without Markdown fences or additional keys: {json.dumps(completion_shape)}'
+        ),
     ))
 
 
@@ -183,6 +183,8 @@ def parse_completion(
         raise ValueError(
             f'{harness_name} final response has invalid keys; expected '
             + ', '.join(sorted(expected_keys))
+            + '; received '
+            + ', '.join(sorted(str(key) for key in parsed))
             + '.'
         )
     if phase == 'proposal':

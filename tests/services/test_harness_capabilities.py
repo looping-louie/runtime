@@ -1,17 +1,17 @@
-"""Tests for local Harness capability detection."""
+"""Tests for configured local Harness capability validation."""
 
 from __future__ import annotations
 
 import subprocess
 
-from harnesses.capabilities import (
-    HarnessCapabilityDetector,
-    detect_harness_capabilities,
-)
+import pytest
+
+from harnesses.capabilities import validate_harness_capabilities
+from configuration.runtime import HarnessConfig
 
 
-def test_detect_harnesses_includes_authenticated_codex() -> None:
-    """Codex is advertised only after its local login check succeeds."""
+def test_validate_harnesses_accepts_authenticated_codex() -> None:
+    """Configured Codex requires a successful local login check."""
 
     calls: list[list[str]] = []
 
@@ -21,14 +21,34 @@ def test_detect_harnesses_includes_authenticated_codex() -> None:
         calls.append(command)
         return subprocess.CompletedProcess(command, 0, '', '')
 
-    capabilities = detect_harness_capabilities(run=run)
+    validate_harness_capabilities((
+        HarnessConfig(kind='louie'),
+        HarnessConfig(kind='codex_cli', binary='codex'),
+    ), run=run)
 
-    assert capabilities == ('louie', 'codex_cli', 'copilot_cli')
-    assert calls == [['codex', 'login', 'status'], ['copilot', '--version']]
+    assert calls == [['codex', 'login', 'status']]
 
 
-def test_detect_harnesses_includes_available_copilot() -> None:
-    """Copilot is advertised after its executable preflight succeeds."""
+def test_validate_harnesses_uses_configured_codex_binary() -> None:
+    """Codex preflight honors the executable-location override."""
+
+    calls: list[list[str]] = []
+
+    def run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        """Record successful Codex preflight commands."""
+
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, '', '')
+
+    validate_harness_capabilities((
+        HarnessConfig(kind='codex_cli', binary='/opt/bin/codex'),
+    ), run=run)
+
+    assert calls == [['/opt/bin/codex', 'login', 'status']]
+
+
+def test_validate_harnesses_accepts_available_copilot() -> None:
+    """Configured Copilot requires a successful executable preflight."""
 
     calls: list[list[str]] = []
 
@@ -38,45 +58,39 @@ def test_detect_harnesses_includes_available_copilot() -> None:
         calls.append(command)
         return subprocess.CompletedProcess(command, 0, '', '')
 
-    assert detect_harness_capabilities(run=run) == ('louie', 'codex_cli', 'copilot_cli')
-    assert calls[-1] == ['copilot', '--version']
+    validate_harness_capabilities((
+        HarnessConfig(kind='louie'),
+        HarnessConfig(kind='copilot_cli', binary='copilot'),
+    ), run=run)
+
+    assert calls == [['copilot', '--version']]
 
 
-def test_detect_harnesses_omits_unauthenticated_codex() -> None:
-    """A failed login check prevents the worker from claiming Codex runs."""
+def test_validate_harnesses_rejects_unauthenticated_codex() -> None:
+    """A failed login check prevents the runtime from starting with Codex."""
 
     def run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
         """Reject the local login check."""
 
         return subprocess.CompletedProcess(command, 1, '', '')
 
-    assert detect_harness_capabilities(run=run) == ('louie',)
+    with pytest.raises(RuntimeError, match='codex_cli'):
+        validate_harness_capabilities((
+            HarnessConfig(kind='louie'),
+            HarnessConfig(kind='codex_cli', binary='codex'),
+        ), run=run)
 
 
-def test_detect_harnesses_omits_missing_codex() -> None:
-    """A missing configured executable leaves Louie as the sole capability."""
+def test_validate_harnesses_rejects_missing_codex() -> None:
+    """A missing configured executable prevents the runtime from starting."""
 
     def run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
         """Simulate an executable absent from PATH."""
 
         raise FileNotFoundError(command[0])
 
-    assert detect_harness_capabilities(run=run) == ('louie',)
-
-
-def test_capability_detector_refreshes_authentication_after_interval() -> None:
-    """A later heartbeat can advertise Codex after local login succeeds."""
-
-    now = [0.0]
-    observed = iter((('louie',), ('louie', 'codex_cli')))
-    detector = HarnessCapabilityDetector(
-        refresh_interval_seconds=30,
-        clock=lambda: now[0],
-        detect=lambda: next(observed),
-    )
-
-    assert detector.current() == ('louie',)
-    now[0] = 29
-    assert detector.current() == ('louie',)
-    now[0] = 30
-    assert detector.current() == ('louie', 'codex_cli')
+    with pytest.raises(RuntimeError, match='codex_cli'):
+        validate_harness_capabilities((
+            HarnessConfig(kind='louie'),
+            HarnessConfig(kind='codex_cli', binary='codex'),
+        ), run=run)

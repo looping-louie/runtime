@@ -1,45 +1,65 @@
 # Runtime folders
+
 .looping-louie/
 runtime/
 
+
+# Virtual environments
+
+env/
+venv/
+.venv/
+
+
+# Environment variables
+
+.env
+.env.*
+runtime.json
+
+
+# IDEs
+
+.vscode/
+.idea/
+
+
+# OS
+
+.DS_Store
+Thumbs.db
+
+
 # Python
+
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
 
-# Virtual environments
-env/
-venv/
-.venv/
-
-# Environment variables
-.env
-.env.*
-
-# IDEs
-.vscode/
-.idea/
-
-# OS
-.DS_Store
-Thumbs.db
 
 # Python tooling
+
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
 htmlcov/
 
+
 # Build artifacts
+
 build/
 dist/
 *.egg-info/
 
+
 # Logs
+
 *.log
 
+
 # Local SQLite (if ever used)
+
 *.db
 *.sqlite3

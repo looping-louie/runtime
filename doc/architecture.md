@@ -16,7 +16,7 @@ local Git operations have dedicated packages.
 src/
 |-- main.py                Builds configured clients, worker, and polling loop
 |-- configuration/         Parses configuration and persists provisioned IDs
-|-- provisioning.py        Creates missing workers and persists their IDs
+|-- provisioning.py        Registers one Worker and reconciles Project enablements
 |-- polling/               Polls project queues with operational retry
 |-- clients/
 |   |-- api_client.py      Provides shared authenticated HTTP transport
@@ -74,7 +74,7 @@ tests/
 ## Composition
 
 `main.py` is the composition root. It loads and validates `RuntimeConfig`,
-constructs the cached local-Harness detector, provisions missing workers,
+constructs the cached local-Harness detector, registers the Worker,
 creates the HTTP clients, passes them to `ActivityExecutor`, and constructs
 `RuntimeWorker` with the executor callback and capability supplier. It then
 invokes `run_forever`.

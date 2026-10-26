@@ -3,43 +3,76 @@
 The runtime is the worker process that claims queued Pipeline runs from the
 Looping Louie API and executes them in configured local Git checkouts.
 
-## Installation
+## Deployment
 
-Install the runtime from this repository:
+## Deploy with docker
+
+For a containerized installation, follow the instructions in
+[Docker](doc/docker.md).
+
+## Deploy manually
+
+### Installation
+
+Clone this repo and install using pip:
+
+> [!CAUTION]
+>
+> It is strongly recommended to run the below commands in a virtualenv created
+> for this project. All subsequent instructions assume you have created and
+> activated such virtual environment.
+>
+> ```sh
+> python3 -m venv env
+> . env/bin/activate
+> ```
 
 ```sh
 pip install .
 ```
 
-## Configuration
+### Configuration
 
-Each worker maps API projects to local repository checkouts. This keeps a
-worker from executing a task in an arbitrary directory supplied by an API run.
-The top-level `user_id` is propagated as `X-User-ID` on every API request.
-On the first normal start, each project without a `worker_id` is provisioned
-through `POST /api/v1/workers`; the API-generated ID is written back to this
-file immediately and reused on later starts.
+Before starting the runtime, create `runtime.json` in the directory where you
+will run the commands below. A [template](./assets/config/runtime.json.tpl) for
+this file is available at the `assets` directory. You can copy it and fill in
+your specific configuration. Remove its comments to make it valid JSON.
+
+```sh
+cp assets/config/runtime.json.tpl runtime.json
+nano runtime.json
+```
+
+A full `runtime.json` configuration file should resemble something like this:
 
 ```json
 {
-	"api_base_url": "http://127.0.0.1:8000/api/v1",
-	"user_id": "local-user",
-	"poll_interval_seconds": 2,
-	"projects": [
-		{
-			"project_id": "local-project",
-			"repository_path": "/absolute/path/to/checkout"
-		}
-	]
+  "api_base_url": "http://127.0.0.1:2000/api/v1",
+  "user_id": "local-user",
+  "poll_interval_seconds": 2,
+  "harnesses": [
+    {
+      "kind": "louie"
+    }
+  ],
+  "projects": [
+    {
+      "project_id": "project-id",
+      "repository_path": "/absolute/path/to/checkout"
+    }
+  ]
 }
 ```
 
 Validate configuration, Git checkout ownership, and a clean worktree before
-starting a worker:
+starting a worker (a silent response means success, any error will be otherwise
+printed in console):
 
 ```sh
 looping-louie-runtime --config runtime.json --check
 ```
+
+### Execution
 
 Start the worker from a normal terminal:
 
@@ -47,15 +80,11 @@ Start the worker from a normal terminal:
 looping-louie-runtime --config runtime.json
 ```
 
-During initial provisioning, the runtime always advertises `louie`. It also
-advertises `codex_cli` only when the configured `LOUIE_CODEX_COMMAND` passes
-both `--version` and `login status`. The same detection is refreshed while the
-worker runs and the current Harness set is sent with each project heartbeat.
-Installing Codex, logging in, or logging out therefore updates claim admission
-without replacing the persisted `worker_id`; detection is cached for 30
-seconds. It advertises `copilot_cli` when `LOUIE_COPILOT_COMMAND` (defaulting
-to `copilot`) passes `--version`; Copilot authentication is verified when the
-CLI executes the selected turn.
+On the first normal start, the runtime registers one Worker through
+`POST /api/v1/workers`; its API-generated ID is written to the top
+level of `runtime.json` immediately. Every configured Project is then enabled
+for that Worker. Later starts reuse the ID and safely reconcile the same
+Project enablements. Do not add `worker_id` yourself.
 
 The worker polls every configured project, claims at most one available run
 per project in each cycle, and waits for `poll_interval_seconds` before the
@@ -65,3 +94,22 @@ defects stop the worker instead of retrying indefinitely.
 
 Pipeline and Activity checkpoint behavior is documented in
 [Pipeline Execution Lifecycle](doc/lifecycle.md).
+
+### Harness configuration and availability
+
+The required `harnesses` list in `runtime.json` declares every Harness the
+runtime is allowed to execute and publish to the API (an empty list keeps
+the worker connected but unable to claim Harness work). The
+[configuration template](assets/config/runtime.json.tpl) documents every
+available field.
+
+Startup and `--check` validate every declared CLI Harness:
+
+- `codex_cli` uses its optional `binary` field (default: `codex`) to pass
+  `login status`.
+- `copilot_cli` uses its optional `binary` field (default: `copilot`) to pass
+  `--version`.
+
+The Docker image includes both CLI executables. Installing an executable does
+not authenticate it; configure authentication before declaring its Harness in
+`runtime.json`.

@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'looping-louie-runtime'
-version = '0.2.0'
+version = '0.3.0'
 description = 'Runtime for the Looping Louie platform.'
 requires-python = '>=3.12'
 dependencies = [
@@ -23,7 +23,7 @@ looping-louie-runtime = 'main:main'
 
 [tool.setuptools]
 package-dir = {'' = 'src'}
-py-modules = ['main']
+py-modules = ['main', 'provisioning']
 
 [tool.setuptools.packages.find]
 where = ['src']
