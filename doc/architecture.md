@@ -74,10 +74,12 @@ tests/
 ## Composition
 
 `main.py` is the composition root. It loads and validates `RuntimeConfig`,
-constructs the cached local-Harness detector, registers the Worker,
-creates the HTTP clients, passes them to `ActivityExecutor`, and constructs
+constructs the cached local-Harness detector, creates the HTTP clients, passes
+them to `ActivityExecutor`, and constructs `ProvisioningRuntimeWorker`. The
+provisioning worker registers the Worker before lazily constructing
 `RuntimeWorker` with the executor callback and capability supplier. It then
-invokes `run_forever`.
+invokes `run_forever`, which retries an unavailable API at the configured
+polling interval.
 
 Dependency flow is:
 

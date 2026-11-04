@@ -9,12 +9,12 @@ from pathlib import Path
 from clients.activity_client import ActivityRunClient
 from clients.pipeline_client import PipelineRunClaimClient
 from clients.worker_client import WorkerHeartbeatClient
-from configuration.runtime import initialize_config, load_config
+from configuration.runtime import RuntimeConfig, initialize_config, load_config
 from harnesses.capabilities import validate_harness_capabilities
 from harnesses.executor import execute_harness
 from polling.loop import run_forever
 from polling.worker import RuntimeWorker
-from provisioning import provision_worker
+from provisioning import ProvisioningRuntimeWorker
 from runs.executor import ActivityExecutor
 
 
@@ -89,12 +89,6 @@ def main() -> None:
         api_base_url=config.api_base_url,
         user_id=config.user_id,
     )
-    config = provision_worker(
-        config_path=arguments.config,
-        config=config,
-        client=worker_client,
-        harnesses=config.harness_kinds,
-    )
     activity_client = ActivityRunClient(
         api_base_url=config.api_base_url,
         user_id=config.user_id,
@@ -103,15 +97,29 @@ def main() -> None:
         api_base_url=config.api_base_url,
         user_id=config.user_id,
     )
-    worker = RuntimeWorker(
+    def create_worker(provisioned_config: RuntimeConfig) -> RuntimeWorker:
+        """Build the polling worker after the API assigns a Worker identity."""
+
+        return RuntimeWorker(
+            config=provisioned_config,
+            claim_client=pipeline_client,
+            heartbeat_client=worker_client,
+            execute_claim=ActivityExecutor(
+                activity_client=activity_client,
+                pipeline_client=pipeline_client,
+                harness_runner=partial(
+                    execute_harness,
+                    binaries=provisioned_config.harness_binaries,
+                ),
+            ).execute_claim,
+        )
+
+    worker = ProvisioningRuntimeWorker(
+        config_path=arguments.config,
         config=config,
-        claim_client=pipeline_client,
-        heartbeat_client=worker_client,
-        execute_claim=ActivityExecutor(
-            activity_client=activity_client,
-            pipeline_client=pipeline_client,
-            harness_runner=partial(execute_harness, binaries=config.harness_binaries),
-        ).execute_claim,
+        client=worker_client,
+        harnesses=config.harness_kinds,
+        worker_factory=create_worker,
     )
     run_forever(
         worker=worker,

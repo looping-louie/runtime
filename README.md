@@ -5,14 +5,14 @@ Looping Louie API and executes them in configured local Git checkouts.
 
 ## Deployment
 
-## Deploy with docker
+### Deploy with docker
 
 For a containerized installation, follow the instructions in
 [Docker](doc/docker.md).
 
-## Deploy manually
+### Deploy manually
 
-### Installation
+#### Installation
 
 Clone this repo and install using pip:
 
@@ -31,7 +31,7 @@ Clone this repo and install using pip:
 pip install .
 ```
 
-### Configuration
+#### Configuration
 
 Before starting the runtime, create `runtime.json` in the directory where you
 will run the commands below. A [template](./assets/config/runtime.json.tpl) for
@@ -72,7 +72,7 @@ printed in console):
 looping-louie-runtime --config runtime.json --check
 ```
 
-### Execution
+#### Execution
 
 Start the worker from a normal terminal:
 
@@ -84,7 +84,9 @@ On the first normal start, the runtime registers one Worker through
 `POST /api/v1/workers`; its API-generated ID is written to the top
 level of `runtime.json` immediately. Every configured Project is then enabled
 for that Worker. Later starts reuse the ID and safely reconcile the same
-Project enablements. Do not add `worker_id` yourself.
+Project enablements. Do not add `worker_id` yourself. If the API is unavailable
+during startup or reconciliation, the process logs the failed attempt and
+retries after `poll_interval_seconds` instead of terminating.
 
 The worker polls every configured project, claims at most one available run
 per project in each cycle, and waits for `poll_interval_seconds` before the
@@ -95,7 +97,7 @@ defects stop the worker instead of retrying indefinitely.
 Pipeline and Activity checkpoint behavior is documented in
 [Pipeline Execution Lifecycle](doc/lifecycle.md).
 
-### Harness configuration and availability
+## Harness configuration and availability
 
 The required `harnesses` list in `runtime.json` declares every Harness the
 runtime is allowed to execute and publish to the API (an empty list keeps

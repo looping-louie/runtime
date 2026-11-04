@@ -46,6 +46,9 @@ runtime JSON before enabling every configured Project. Later starts reuse that
 ID and reconcile the idempotent enablements. During polling, a shared detector
 refreshes at most every 30 seconds and one Worker heartbeat replaces the API's
 observed Harness set before the runtime claims work in each enabled Project.
+If the API cannot be reached during provisioning or reconciliation, the runtime
+logs the failure and retries the complete operation after its configured polling
+interval without terminating.
 Consequently a queued Codex run becomes claimable after a successful local login
 without recreating the Worker or Pipeline run. The runtime does not enumerate
 CLI models; the API freezes the requested model and the CLI determines whether
