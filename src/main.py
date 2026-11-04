@@ -34,7 +34,7 @@ def _project_mapping(value: str) -> tuple[str, str]:
     return project_id, repository_path
 
 
-def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespace:
+def _parse_run_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse persistent runtime CLI arguments."""
 
     parser = argparse.ArgumentParser(description='Looping Louie runtime worker.')
@@ -104,10 +104,10 @@ def check() -> None:
     _validate_config(arguments.config)
 
 
-def main() -> None:
+def run() -> None:
     """Initialize configuration and run the configured runtime worker indefinitely."""
 
-    arguments = _parse_arguments()
+    arguments = _parse_run_arguments()
     initialize_config(
         arguments.config,
         defaults_path=DEFAULT_DOCKER_CONFIG,

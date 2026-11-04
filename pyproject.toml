@@ -19,7 +19,8 @@ test = [
 ]
 
 [project.scripts]
-looping-louie-runtime = 'main:main'
+looping-louie-runtime = 'main:run'
+looping-louie-runtime-run = 'main:run'
 looping-louie-runtime-check = 'main:check'
 
 [tool.setuptools]
