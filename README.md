@@ -78,7 +78,7 @@ starting a worker (a silent response means success, any error will be otherwise
 printed in console):
 
 ```sh
-looping-louie-runtime --check
+make check
 ```
 
 #### Execution
@@ -114,7 +114,7 @@ the worker connected but unable to claim Harness work). The
 [configuration template](assets/config/.env.json.tpl) documents every
 available field.
 
-Startup and `--check` validate every declared CLI Harness:
+Startup and `looping-louie-runtime-check` validate every declared CLI Harness:
 
 - `codex_cli` uses its optional `binary` field (default: `codex`) to pass
   `login status`.

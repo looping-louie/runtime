@@ -3,7 +3,8 @@
 PYTHON ?= python3
 VENV := env
 VENV_PYTHON := $(VENV)/bin/python
-RUNTIME := $(VENV)/bin/looping-louie-runtime
+RUNTIME_EXECUTABLE := $(VENV)/bin/looping-louie-runtime
+CHECK_EXECUTABLE := $(VENV)/bin/looping-louie-runtime-check
 
 install:
 	@if [ ! -x "$(VENV_PYTHON)" ]; then \
@@ -16,7 +17,7 @@ test:
 	@"$(VENV_PYTHON)" -m pytest
 
 check:
-	@"$(RUNTIME)" --check
+	@"$(CHECK_EXECUTABLE)"
 
 build:
 	@"$(VENV_PYTHON)" -m pip wheel --no-deps --wheel-dir dist .

@@ -6,7 +6,12 @@ import argparse
 
 import pytest
 
-from main import DEFAULT_CONFIG_PATH, _parse_arguments, _project_mapping
+from main import (
+    DEFAULT_CONFIG_PATH,
+    _parse_arguments,
+    _parse_check_arguments,
+    _project_mapping,
+)
 
 
 def test_project_mapping_parses_a_project_id_and_checkout_path() -> None:
@@ -19,9 +24,17 @@ def test_project_mapping_parses_a_project_id_and_checkout_path() -> None:
 
 
 def test_default_config_path_is_dot_env_json() -> None:
-    """The CLI discovers the conventional local runtime configuration by default."""
+    """Both runtime commands discover the conventional local configuration by default."""
 
     assert _parse_arguments([]).config == DEFAULT_CONFIG_PATH
+    assert _parse_check_arguments([]).config == DEFAULT_CONFIG_PATH
+
+
+def test_runtime_arguments_do_not_include_configuration_check_mode() -> None:
+    """The persistent runtime executable does not provide a one-shot check flag."""
+
+    with pytest.raises(SystemExit):
+        _parse_arguments(['--check'])
 
 
 @pytest.mark.parametrize('value', ('project-1', ':checkout', 'project-1:'))

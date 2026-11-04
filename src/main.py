@@ -35,7 +35,7 @@ def _project_mapping(value: str) -> tuple[str, str]:
 
 
 def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespace:
-    """Parse runtime CLI arguments."""
+    """Parse persistent runtime CLI arguments."""
 
     parser = argparse.ArgumentParser(description='Looping Louie runtime worker.')
     parser.add_argument(
@@ -71,16 +71,41 @@ def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespa
         type=float,
         help='Polling interval used only to create a missing runtime configuration.',
     )
+    return parser.parse_args(arguments)
+
+
+def _parse_check_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespace:
+    """Parse runtime configuration-check CLI arguments."""
+
+    parser = argparse.ArgumentParser(
+        description='Validate a Looping Louie runtime configuration.',
+    )
     parser.add_argument(
-        '--check',
-        action='store_true',
-        help='Validate configured checkouts without starting a worker.',
+        '--config',
+        default=DEFAULT_CONFIG_PATH,
+        help='Path to runtime JSON configuration (default: .env.json).',
     )
     return parser.parse_args(arguments)
 
 
+def _validate_config(config_path: str | Path) -> RuntimeConfig:
+    """Load and validate a runtime configuration and its local dependencies."""
+
+    config = load_config(config_path)
+    config.validate_checkouts()
+    validate_harness_capabilities(config.harnesses)
+    return config
+
+
+def check() -> None:
+    """Validate a runtime configuration without starting a persistent worker."""
+
+    arguments = _parse_check_arguments()
+    _validate_config(arguments.config)
+
+
 def main() -> None:
-    """Validate configuration and run the configured runtime worker indefinitely."""
+    """Initialize configuration and run the configured runtime worker indefinitely."""
 
     arguments = _parse_arguments()
     initialize_config(
@@ -92,11 +117,7 @@ def main() -> None:
         harnesses=tuple(arguments.harness),
         poll_interval_seconds=arguments.poll_interval_seconds,
     )
-    config = load_config(arguments.config)
-    config.validate_checkouts()
-    validate_harness_capabilities(config.harnesses)
-    if arguments.check:
-        return
+    config = _validate_config(arguments.config)
     worker_client = WorkerHeartbeatClient(
         api_base_url=config.api_base_url,
         user_id=config.user_id,
