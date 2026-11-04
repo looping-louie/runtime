@@ -31,6 +31,15 @@ Clone this repo and install using pip:
 pip install .
 ```
 
+For repeatable development commands, use:
+
+```sh
+make install
+make test
+make check
+make build
+```
+
 #### Configuration
 
 Before starting the runtime, create `.env.json` in the directory where you
