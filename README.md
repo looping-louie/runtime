@@ -33,17 +33,17 @@ pip install .
 
 #### Configuration
 
-Before starting the runtime, create `runtime.json` in the directory where you
-will run the commands below. A [template](./assets/config/runtime.json.tpl) for
+Before starting the runtime, create `.env.json` in the directory where you
+will run the commands below. A [template](./assets/config/.env.json.tpl) for
 this file is available at the `assets` directory. You can copy it and fill in
 your specific configuration. Remove its comments to make it valid JSON.
 
 ```sh
-cp assets/config/runtime.json.tpl runtime.json
-nano runtime.json
+cp assets/config/.env.json.tpl .env.json
+nano .env.json
 ```
 
-A full `runtime.json` configuration file should resemble something like this:
+A full `.env.json` configuration file should resemble something like this:
 
 ```json
 {
@@ -69,7 +69,7 @@ starting a worker (a silent response means success, any error will be otherwise
 printed in console):
 
 ```sh
-looping-louie-runtime --config runtime.json --check
+looping-louie-runtime --check
 ```
 
 #### Execution
@@ -77,12 +77,12 @@ looping-louie-runtime --config runtime.json --check
 Start the worker from a normal terminal:
 
 ```sh
-looping-louie-runtime --config runtime.json
+looping-louie-runtime
 ```
 
 On the first normal start, the runtime registers one Worker through
 `POST /api/v1/workers`; its API-generated ID is written to the top
-level of `runtime.json` immediately. Every configured Project is then enabled
+level of `.env.json` immediately. Every configured Project is then enabled
 for that Worker. Later starts reuse the ID and safely reconcile the same
 Project enablements. Do not add `worker_id` yourself. If the API is unavailable
 during startup or reconciliation, the process logs the failed attempt and
@@ -99,10 +99,10 @@ Pipeline and Activity checkpoint behavior is documented in
 
 ## Harness configuration and availability
 
-The required `harnesses` list in `runtime.json` declares every Harness the
+The required `harnesses` list in `.env.json` declares every Harness the
 runtime is allowed to execute and publish to the API (an empty list keeps
 the worker connected but unable to claim Harness work). The
-[configuration template](assets/config/runtime.json.tpl) documents every
+[configuration template](assets/config/.env.json.tpl) documents every
 available field.
 
 Startup and `--check` validate every declared CLI Harness:
@@ -114,4 +114,4 @@ Startup and `--check` validate every declared CLI Harness:
 
 The Docker image includes both CLI executables. Installing an executable does
 not authenticate it; configure authentication before declaring its Harness in
-`runtime.json`.
+`.env.json`.

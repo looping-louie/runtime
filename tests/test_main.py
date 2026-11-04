@@ -6,7 +6,7 @@ import argparse
 
 import pytest
 
-from main import _project_mapping
+from main import DEFAULT_CONFIG_PATH, _parse_arguments, _project_mapping
 
 
 def test_project_mapping_parses_a_project_id_and_checkout_path() -> None:
@@ -16,6 +16,12 @@ def test_project_mapping_parses_a_project_id_and_checkout_path() -> None:
         'project-1',
         '/app/data/projects/project:archive',
     )
+
+
+def test_default_config_path_is_dot_env_json() -> None:
+    """The CLI discovers the conventional local runtime configuration by default."""
+
+    assert _parse_arguments([]).config == DEFAULT_CONFIG_PATH
 
 
 @pytest.mark.parametrize('value', ('project-1', ':checkout', 'project-1:'))

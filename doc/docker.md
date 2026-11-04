@@ -18,15 +18,21 @@ docker build \
   -t looping-louie-runtime:latest .
 ```
 
+Published release images support both `linux/amd64` and `linux/arm64`; Docker
+selects the matching image automatically. Pull
+`ghcr.io/looping-louie/runtime:<version>` for a published release. A Raspberry
+Pi 4 needs a 64-bit operating system because 32-bit `linux/arm/v7` is not
+published.
+
 Installing an executable does not authenticate it. Declare only the Harnesses
-that are configured and authenticated for this container in `runtime.json`.
+that are configured and authenticated for this container in `.env.json`.
 For example, use `[{'kind': 'codex_cli'}]` only after Codex authentication is
 available. Use `[]` for a connected worker that must not receive Harness work.
 
 ## Start the runtime
 
-The image creates `/app/config/runtime.json` during its first start from
-the shared [configuration template](../assets/config/runtime.json.tpl). Mount a
+The image creates `/app/config/.env.json` during its first start from
+the shared [configuration template](../assets/config/.env.json.tpl). Mount a
 writable configuration directory and each Git checkout the worker manages:
 
 ```sh
@@ -48,7 +54,7 @@ docker run --rm \
   --harness louie
 ```
 
-The image has a default `--config /app/config/runtime.json` command. The
+The image has a default `--config /app/config/.env.json` command. The
 first-start flags create that file from image defaults with the supplied API,
 User, Project, checkout, and Harness values. Repeat `--project` for each
 `PROJECT_ID:REPOSITORY_PATH` mapping and mount its host checkout at that path.
@@ -57,7 +63,7 @@ Repeated `--harness` flags declare multiple capabilities, such as
 
 After the first start, the runtime reuses the existing configuration and
 ignores these initialization flags. Change configuration by editing or removing
-`config/runtime.json`; never mount that file individually. The runtime
+`config/.env.json`; never mount that file individually. The runtime
 registers one Worker, atomically writes its generated `worker_id` to the
 mounted configuration directory, and safely enables every configured Project
 on each start.

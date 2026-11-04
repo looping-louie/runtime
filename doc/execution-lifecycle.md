@@ -91,7 +91,7 @@ at `.agents/skills/<name>/SKILL.md`; Copilot materializes them at
 the checkout diff is collected.
 
 The runtime reads CLI executable locations from each Harness declaration in
-`runtime.json`: `codex_cli.binary` defaults to `codex` and
+`.env.json`: `codex_cli.binary` defaults to `codex` and
 `copilot_cli.binary` defaults to `copilot`. `LOUIE_CODEX_SANDBOX` defaults to
 `workspace-write`; `LOUIE_CODEX_TIMEOUT_SECONDS` and
 `LOUIE_COPILOT_TIMEOUT_SECONDS` default to `1800`. Codex authentication remains

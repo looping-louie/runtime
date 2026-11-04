@@ -19,7 +19,7 @@ from configuration.runtime import (
 def write_config(tmp_path: Path, payload: dict[str, object]) -> Path:
     """Write one JSON configuration fixture and return its path."""
 
-    path = tmp_path / 'runtime.json'
+    path = tmp_path / '.env.json'
     path.write_text(json.dumps(payload), encoding='utf-8')
     return path
 
@@ -188,7 +188,7 @@ def test_initialize_config_creates_a_first_start_configuration(tmp_path: Path) -
         'harnesses': [],
         'projects': [],
     })
-    config_path = tmp_path / 'runtime-config' / 'runtime.json'
+    config_path = tmp_path / 'runtime-config' / '.env.json'
 
     created = initialize_config(
         config_path,

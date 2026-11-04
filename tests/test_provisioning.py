@@ -141,7 +141,7 @@ class _PollingWorker:
 def _write_config(tmp_path: Path, *, worker_id: str | None) -> Path:
     """Write one provisioned or initial runtime configuration."""
 
-    path = tmp_path / 'runtime.json'
+    path = tmp_path / '.env.json'
     payload: dict[str, object] = {
             'api_base_url': 'https://api.example/api/v1',
             'user_id': 'user-1',

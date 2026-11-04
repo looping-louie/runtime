@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
 
@@ -18,7 +19,8 @@ from provisioning import ProvisioningRuntimeWorker
 from runs.executor import ActivityExecutor
 
 
-DEFAULT_DOCKER_CONFIG = Path('/app/assets/default-runtime.json')
+DEFAULT_CONFIG_PATH = Path('.env.json')
+DEFAULT_DOCKER_CONFIG = Path('/app/assets/default.env.json')
 
 
 def _project_mapping(value: str) -> tuple[str, str]:
@@ -32,11 +34,15 @@ def _project_mapping(value: str) -> tuple[str, str]:
     return project_id, repository_path
 
 
-def main() -> None:
-    """Validate configuration and run the configured runtime worker indefinitely."""
+def _parse_arguments(arguments: Sequence[str] | None = None) -> argparse.Namespace:
+    """Parse runtime CLI arguments."""
 
     parser = argparse.ArgumentParser(description='Looping Louie runtime worker.')
-    parser.add_argument('--config', required=True, help='Path to runtime JSON configuration.')
+    parser.add_argument(
+        '--config',
+        default=DEFAULT_CONFIG_PATH,
+        help='Path to runtime JSON configuration (default: .env.json).',
+    )
     parser.add_argument(
         '--api-base-url',
         help='API base URL used only to create a missing runtime configuration.',
@@ -70,7 +76,13 @@ def main() -> None:
         action='store_true',
         help='Validate configured checkouts without starting a worker.',
     )
-    arguments = parser.parse_args()
+    return parser.parse_args(arguments)
+
+
+def main() -> None:
+    """Validate configuration and run the configured runtime worker indefinitely."""
+
+    arguments = _parse_arguments()
     initialize_config(
         arguments.config,
         defaults_path=DEFAULT_DOCKER_CONFIG,
