@@ -144,7 +144,7 @@ def _write_config(tmp_path: Path, *, worker_id: str | None) -> Path:
     path = tmp_path / '.env.json'
     payload: dict[str, object] = {
             'api_base_url': 'https://api.example/api/v1',
-            'user_id': 'user-1',
+            'service_account_token': 'user-1',
             'poll_interval_seconds': 2,
             'harnesses': [
                 {'kind': 'louie'},

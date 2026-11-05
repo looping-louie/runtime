@@ -20,7 +20,7 @@ def test_worker_client_heartbeats_global_worker() -> None:
 
     client = WorkerHeartbeatClient(
         api_base_url='https://api.example/api/v1',
-        user_id='user-1',
+        service_account_token='service-token',
         client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
 
@@ -33,7 +33,7 @@ def test_worker_client_heartbeats_global_worker() -> None:
         ('POST', '/api/v1/workers/worker-1/heartbeat'),
     ]
     assert all('X-Project-ID' not in request.headers for request in requests)
-    assert all(request.headers['X-User-ID'] == 'user-1' for request in requests)
+    assert all(request.headers['Authorization'] == 'Bearer service-token' for request in requests)
     assert requests[0].read() == (
         b'{"harnesses":[{"kind":"louie","version":"v1","config":{}}]}'
     )
@@ -48,7 +48,7 @@ def test_worker_client_registers_global_worker_with_detected_harnesses() -> None
         assert request.method == 'POST'
         assert request.url.path == '/api/v1/workers'
         assert request.headers['X-Project-ID'] == 'project-1'
-        assert request.headers['X-User-ID'] == 'user-1'
+        assert request.headers['Authorization'] == 'Bearer service-token'
         assert request.read() == (
             b'{"project_id":"project-1","harnesses":[{"kind":"louie","version":"v1","config":{}},'
             b'{"kind":"codex_cli","version":"v1","config":{}}]}'
@@ -57,7 +57,7 @@ def test_worker_client_registers_global_worker_with_detected_harnesses() -> None
 
     client = WorkerHeartbeatClient(
         api_base_url='https://api.example/api/v1',
-        user_id='user-1',
+        service_account_token='service-token',
         client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
 

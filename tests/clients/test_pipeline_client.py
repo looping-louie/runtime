@@ -19,7 +19,7 @@ def test_claim_next_discovers_and_conditionally_claims_a_run() -> None:
 
         requests.append(request)
         assert request.headers['X-Project-ID'] == 'project-1'
-        assert request.headers['X-User-ID'] == 'user-1'
+        assert request.headers['Authorization'] == 'Bearer service-token'
         if request.method == 'GET' and request.url.path == '/api/v1/pipelines':
             assert request.url.params['status'] == 'active'
             return httpx.Response(200, json={'items': [{'id': 'pipeline-1'}], 'total': 1})
@@ -45,7 +45,7 @@ def test_claim_next_discovers_and_conditionally_claims_a_run() -> None:
 
     client = PipelineRunClaimClient(
         api_base_url='https://api.example/api/v1',
-        user_id='user-1',
+        service_account_token='service-token',
         client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
 
@@ -72,7 +72,7 @@ def test_claim_next_returns_none_when_no_pipeline_has_claimable_runs() -> None:
 
     client = PipelineRunClaimClient(
         api_base_url='https://api.example/api/v1',
-        user_id='user-1',
+        service_account_token='service-token',
         client=httpx.Client(
             transport=httpx.MockTransport(handler),
         ),
@@ -111,7 +111,7 @@ def test_claim_next_continues_after_another_worker_wins() -> None:
 
     client = PipelineRunClaimClient(
         api_base_url='https://api.example/api/v1',
-        user_id='user-1',
+        service_account_token='service-token',
         client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
 
@@ -151,7 +151,7 @@ def test_claim_next_stops_when_the_global_worker_is_at_capacity() -> None:
 
     client = PipelineRunClaimClient(
         api_base_url='https://api.example/api/v1',
-        user_id='user-1',
+        service_account_token='service-token',
         client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
 
@@ -191,7 +191,7 @@ def test_continue_run_uses_workspace_scoped_contract() -> None:
             'https://api.example/api/v1/pipelines/pipeline-1/runs/run-1/continue'
         )
         assert request.headers['X-Project-ID'] == 'project-1'
-        assert request.headers['X-User-ID'] == 'user-1'
+        assert request.headers['Authorization'] == 'Bearer service-token'
         assert json.loads(request.content) == {'lease_token': 'lease-1'}
         return httpx.Response(
             200,
@@ -205,7 +205,7 @@ def test_continue_run_uses_workspace_scoped_contract() -> None:
 
     client = PipelineRunClaimClient(
         api_base_url='https://api.example/api/v1',
-        user_id='user-1',
+        service_account_token='service-token',
         client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
 
@@ -230,13 +230,13 @@ def test_renew_lease_sends_the_active_claim_token() -> None:
             'https://api.example/api/v1/pipelines/pipeline-1/runs/run-1/lease'
         )
         assert request.headers['X-Project-ID'] == 'project-1'
-        assert request.headers['X-User-ID'] == 'user-1'
+        assert request.headers['Authorization'] == 'Bearer service-token'
         assert json.loads(request.content) == {'lease_token': 'lease-1'}
         return httpx.Response(200, json={'lease_expires_at': '2026-08-19T10:01:00Z'})
 
     client = PipelineRunClaimClient(
         api_base_url='https://api.example/api/v1',
-        user_id='user-1',
+        service_account_token='service-token',
         client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
 

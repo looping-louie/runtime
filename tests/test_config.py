@@ -29,7 +29,7 @@ def config_payload(checkout_path: Path | str = '/checkout') -> dict[str, object]
 
     return {
         'api_base_url': 'http://127.0.0.1:8000/api/v1',
-        'user_id': 'user-local',
+        'service_account_token': 'service-token',
         'worker_id': 'worker-1',
         'poll_interval_seconds': 2,
         'harnesses': [{'kind': 'louie'}],
@@ -50,7 +50,7 @@ def test_load_config_resolves_workspace_checkout(tmp_path: Path) -> None:
     config = load_config(write_config(tmp_path, payload))
 
     assert config.api_base_url == 'http://127.0.0.1:8000/api/v1'
-    assert config.user_id == 'user-local'
+    assert config.service_account_token == 'service-token'
     assert config.harnesses == (
         HarnessConfig(kind='louie'),
         HarnessConfig(kind='codex_cli', binary='codex'),
@@ -78,9 +78,9 @@ def test_load_config_requires_user_identity(tmp_path: Path) -> None:
     """API communication cannot start without an explicit acting User."""
 
     payload = config_payload()
-    del payload['user_id']
+    del payload['service_account_token']
 
-    with pytest.raises(ValueError, match='user_id'):
+    with pytest.raises(ValueError, match='service_account_token'):
         load_config(write_config(tmp_path, payload))
 
 
@@ -183,7 +183,7 @@ def test_initialize_config_creates_a_first_start_configuration(tmp_path: Path) -
 
     defaults_path = write_config(tmp_path, {
         'api_base_url': '',
-        'user_id': '',
+        'service_account_token': '',
         'poll_interval_seconds': 2,
         'harnesses': [],
         'projects': [],
@@ -194,7 +194,7 @@ def test_initialize_config_creates_a_first_start_configuration(tmp_path: Path) -
         config_path,
         defaults_path=defaults_path,
         api_base_url='http://host.docker.internal:2000/api/v1',
-        user_id='local-user',
+        service_account_token='service-token',
         projects=(
             ('local-project', '/app/data/projects/local-project'),
             ('other-project', '/app/data/projects/other-project'),
@@ -226,11 +226,11 @@ def test_initialize_config_preserves_an_existing_configuration(tmp_path: Path) -
         config_path,
         defaults_path=config_path,
         api_base_url=None,
-        user_id=None,
+        service_account_token=None,
         projects=(),
         harnesses=(),
         poll_interval_seconds=None,
     )
 
     assert created is False
-    assert load_config(config_path).user_id == 'user-local'
+    assert load_config(config_path).service_account_token == 'service-token'
