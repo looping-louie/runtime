@@ -74,13 +74,27 @@ def test_load_config_rejects_duplicate_workspace_mapping(tmp_path: Path) -> None
         load_config(write_config(tmp_path, payload))
 
 
-def test_load_config_requires_user_identity(tmp_path: Path) -> None:
-    """API communication cannot start without an explicit acting User."""
+def test_load_config_requires_service_account_token(tmp_path: Path) -> None:
+    """API communication cannot start without a runtime service credential."""
 
     payload = config_payload()
     del payload['service_account_token']
 
     with pytest.raises(ValueError, match='service_account_token'):
+        load_config(write_config(tmp_path, payload))
+
+
+def test_load_config_explains_legacy_user_id_migration(tmp_path: Path) -> None:
+    """Legacy user identity configuration directs operators to a service token."""
+
+    payload = config_payload()
+    payload.pop('service_account_token')
+    payload['user_id'] = 'local-user'
+
+    with pytest.raises(
+        ValueError,
+        match='user_id has been replaced by service_account_token',
+    ):
         load_config(write_config(tmp_path, payload))
 
 

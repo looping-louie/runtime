@@ -48,7 +48,7 @@ docker run --rm \
   -v "$OTHER_PROJECT_PATH:/app/data/projects/other-project" \
   looping-louie-runtime:latest \
   --api-base-url http://host.docker.internal:2000/api/v1 \
-  --user-id local-user \
+  --service-account-token "$LOUIE_RUNTIME_SERVICE_ACCOUNT_TOKEN" \
   --project some-project-id:/app/data/projects/some-project \
   --project other-project-id:/app/data/projects/other-project \
   --harness louie
@@ -56,10 +56,15 @@ docker run --rm \
 
 The image has a default `--config /app/config/.env.json` command. The
 first-start flags create that file from image defaults with the supplied API,
-User, Project, checkout, and Harness values. Repeat `--project` for each
+service-account token, Project, checkout, and Harness values. Repeat `--project` for each
 `PROJECT_ID:REPOSITORY_PATH` mapping and mount its host checkout at that path.
 Repeated `--harness` flags declare multiple capabilities, such as
 `--harness codex_cli --harness copilot_cli`.
+
+Create a separate project-scoped service account for each runtime deployment
+through **Settings → Service accounts**, then set
+`LOUIE_RUNTIME_SERVICE_ACCOUNT_TOKEN` to its one-time token before starting
+the container.
 
 After the first start, the runtime reuses the existing configuration and
 ignores these initialization flags. Change configuration by editing or removing

@@ -57,7 +57,7 @@ A full `.env.json` configuration file should resemble something like this:
 ```json
 {
   "api_base_url": "http://127.0.0.1:2000/api/v1",
-  "user_id": "local-user",
+  "service_account_token": "service-account-token",
   "poll_interval_seconds": 2,
   "harnesses": [
     {
@@ -72,6 +72,11 @@ A full `.env.json` configuration file should resemble something like this:
   ]
 }
 ```
+
+Create one service account for each runtime deployment in **Settings → Service
+accounts**. Select the projects that runtime may execute, copy its one-time
+token, and store it as `service_account_token`. Do not use a human account ID
+or a personal access token for a runtime.
 
 Validate configuration, Git checkout ownership, and a clean worktree before
 starting a worker (a silent response means success, any error will be otherwise

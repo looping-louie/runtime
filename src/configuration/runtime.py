@@ -104,6 +104,12 @@ def load_config(path: str | Path) -> RuntimeConfig:
         raise ValueError(f'Runtime configuration {config_path} is not valid JSON.') from exc
     if not isinstance(raw, dict):
         raise ValueError('Runtime configuration must be a JSON object.')
+    if 'user_id' in raw:
+        raise ValueError(
+            'Runtime configuration user_id has been replaced by '
+            'service_account_token. Create a project-scoped service account '
+            'in Settings, then store its token as service_account_token.'
+        )
     _reject_unknown_fields(
         raw,
         {
