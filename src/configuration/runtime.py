@@ -34,7 +34,7 @@ class RuntimeConfig:
     """Runtime connection settings and authorized project checkouts."""
 
     api_base_url: str
-    user_id: str
+    service_account_token: str
     worker_id: str | None
     poll_interval_seconds: float
     harnesses: tuple[HarnessConfig, ...]
@@ -104,17 +104,26 @@ def load_config(path: str | Path) -> RuntimeConfig:
         raise ValueError(f'Runtime configuration {config_path} is not valid JSON.') from exc
     if not isinstance(raw, dict):
         raise ValueError('Runtime configuration must be a JSON object.')
+    if 'user_id' in raw:
+        raise ValueError(
+            'Runtime configuration user_id has been replaced by '
+            'service_account_token. Create a project-scoped service account '
+            'in Settings, then store its token as service_account_token.'
+        )
     _reject_unknown_fields(
         raw,
         {
-            'api_base_url', 'user_id', 'worker_id', 'poll_interval_seconds',
+            'api_base_url', 'service_account_token', 'worker_id', 'poll_interval_seconds',
             'harnesses', 'projects',
         },
         'Runtime configuration',
     )
     return RuntimeConfig(
         api_base_url=_require_http_url(raw.get('api_base_url'), 'api_base_url'),
-        user_id=_require_text(raw.get('user_id'), 'user_id'),
+        service_account_token=_require_text(
+            raw.get('service_account_token'),
+            'service_account_token',
+        ),
         worker_id=_optional_text(raw.get('worker_id'), 'worker_id'),
         poll_interval_seconds=_require_positive_number(
             raw.get('poll_interval_seconds'), 'poll_interval_seconds',
@@ -129,7 +138,7 @@ def initialize_config(
     *,
     defaults_path: str | Path,
     api_base_url: str | None,
-    user_id: str | None,
+    service_account_token: str | None,
     projects: tuple[tuple[str, str], ...],
     harnesses: tuple[str, ...],
     poll_interval_seconds: float | None,
@@ -141,7 +150,7 @@ def initialize_config(
         return False
     required_values = {
         'api_base_url': api_base_url,
-        'user_id': user_id,
+        'service_account_token': service_account_token,
     }
     missing = [name for name, value in required_values.items() if value is None]
     if not projects:
@@ -153,7 +162,7 @@ def initialize_config(
     defaults = _read_json_object(Path(defaults_path))
     defaults.update({
         'api_base_url': api_base_url,
-        'user_id': user_id,
+        'service_account_token': service_account_token,
         'poll_interval_seconds': (
             poll_interval_seconds
             if poll_interval_seconds is not None

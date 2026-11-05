@@ -68,7 +68,7 @@ def test_run_once_executes_claim_in_its_mapped_checkout(tmp_path: Path) -> None:
     worker = RuntimeWorker(
         config=RuntimeConfig(
             api_base_url='http://127.0.0.1:8000/api/v1',
-            user_id='user-1',
+            service_account_token='service-token',
             worker_id='worker-1',
             poll_interval_seconds=1,
             harnesses=(HarnessConfig(kind='louie'),),
@@ -106,7 +106,7 @@ def test_run_once_continues_after_a_project_has_no_worker_capacity(
     worker = RuntimeWorker(
         config=RuntimeConfig(
             api_base_url='http://127.0.0.1:8000/api/v1',
-            user_id='user-1',
+            service_account_token='service-token',
             worker_id='worker-1',
             poll_interval_seconds=1,
             harnesses=(HarnessConfig(kind='louie'),),
@@ -139,7 +139,7 @@ def test_worker_heartbeats_one_global_worker_before_project_claims(
     worker = RuntimeWorker(
         config=RuntimeConfig(
             api_base_url='http://127.0.0.1:8000/api/v1',
-            user_id='user-1',
+            service_account_token='service-token',
             worker_id='worker-1',
             poll_interval_seconds=1,
             harnesses=(
@@ -194,7 +194,7 @@ def test_run_once_continues_after_one_workspace_execution_fails(
     worker = RuntimeWorker(
         config=RuntimeConfig(
             api_base_url='http://127.0.0.1:8000/api/v1',
-            user_id='user-1',
+            service_account_token='service-token',
             worker_id='worker-1',
             poll_interval_seconds=1,
             harnesses=(HarnessConfig(kind='louie'),),

@@ -16,13 +16,13 @@ class RuntimeApiClient:
         self,
         *,
         api_base_url: str,
-        user_id: str,
+        service_account_token: str,
         client: httpx.Client | None = None,
     ) -> None:
         """Store API identity and optionally inject an HTTP client for tests."""
 
         self._api_base_url = api_base_url.rstrip('/')
-        self._user_id = user_id
+        self._service_account_token = service_account_token
         self._client = client or httpx.Client(timeout=self.request_timeout_seconds)
 
     def _request(
@@ -46,7 +46,9 @@ class RuntimeApiClient:
                 params=params,
                 json=payload,
                 headers={
-                    'X-User-ID': self._user_id,
+                    'Authorization': (
+                        f'Bearer {self._service_account_token}'
+                    ),
                     **(
                         {'X-Project-ID': project_id}
                         if project_id is not None

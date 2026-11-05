@@ -2,10 +2,10 @@
   # the full URL where the API is listining on
   # Example: "http://127.0.0.1:2000/api/v1"
   "api_base_url": "",
-  # the id of the user making the requests. This will be propagated as `X-User-ID`
-  # on every API request
-  # Example: "local-user",
-  "user_id": "",
+  # a project-scoped service-account token created by an administrator.
+  # The runtime sends it as a bearer credential on every API request.
+  # Example: "service-account-token",
+  "service_account_token": "",
   # the time (in seconds) between two consecutive requests to the API
   # Example: 2
   "poll_interval_seconds": 2,

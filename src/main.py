@@ -48,8 +48,8 @@ def _parse_run_arguments(arguments: Sequence[str] | None = None) -> argparse.Nam
         help='API base URL used only to create a missing runtime configuration.',
     )
     parser.add_argument(
-        '--user-id',
-        help='User ID used only to create a missing runtime configuration.',
+        '--service-account-token',
+        help='Service account token used only to create a missing runtime configuration.',
     )
     parser.add_argument(
         '--project',
@@ -112,7 +112,7 @@ def run() -> None:
         arguments.config,
         defaults_path=DEFAULT_DOCKER_CONFIG,
         api_base_url=arguments.api_base_url,
-        user_id=arguments.user_id,
+        service_account_token=arguments.service_account_token,
         projects=tuple(arguments.project),
         harnesses=tuple(arguments.harness),
         poll_interval_seconds=arguments.poll_interval_seconds,
@@ -120,15 +120,15 @@ def run() -> None:
     config = _validate_config(arguments.config)
     worker_client = WorkerHeartbeatClient(
         api_base_url=config.api_base_url,
-        user_id=config.user_id,
+        service_account_token=config.service_account_token,
     )
     activity_client = ActivityRunClient(
         api_base_url=config.api_base_url,
-        user_id=config.user_id,
+        service_account_token=config.service_account_token,
     )
     pipeline_client = PipelineRunClaimClient(
         api_base_url=config.api_base_url,
-        user_id=config.user_id,
+        service_account_token=config.service_account_token,
     )
     def create_worker(provisioned_config: RuntimeConfig) -> RuntimeWorker:
         """Build the polling worker after the API assigns a Worker identity."""

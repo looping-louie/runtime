@@ -41,8 +41,8 @@ class WorkerHeartbeatClient(RuntimeApiClient):
             method='POST',
             project_id=project_id,
             path=(
-                f'/workers/{quote(worker_id, safe="")}/projects/'
-                f'{quote(project_id, safe="")}'
+                f'/projects/{quote(project_id, safe="")}/workers/'
+                f'{quote(worker_id, safe="")}'
             ),
             operation='Worker lifecycle',
             object_error='Worker lifecycle response must be a JSON object.',

@@ -37,7 +37,7 @@ def test_get_and_continue_activity_run_use_workspace_scoped_contract() -> None:
 
     client = ActivityRunClient(
         api_base_url='https://api.example/api/v1',
-        user_id='user-1',
+        service_account_token='service-token',
         client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
 
@@ -57,9 +57,9 @@ def test_get_and_continue_activity_run_use_workspace_scoped_contract() -> None:
         'project-1',
         'project-1',
     ]
-    assert [request.headers['X-User-ID'] for request in requests] == [
-        'user-1',
-        'user-1',
+    assert [request.headers['Authorization'] for request in requests] == [
+        'Bearer service-token',
+        'Bearer service-token',
     ]
     assert requests[0].url == 'https://api.example/api/v1/activities/activity-1/runs/activity-run-1'
     assert requests[1].url == 'https://api.example/api/v1/activities/activity-1/runs/activity-run-1/continue'
