@@ -26,6 +26,7 @@ class PipelineRunClaimClient(RuntimeApiClient):
             for candidate in self._claimable_runs(
                 project_id=project_id,
                 pipeline_id=pipeline_id,
+                worker_id=worker_id,
             ):
                 try:
                     claim = self._claim_candidate(
@@ -57,6 +58,7 @@ class PipelineRunClaimClient(RuntimeApiClient):
         *,
         project_id: str,
         pipeline_id: str,
+        worker_id: str,
     ) -> list[dict[str, object]]:
         """Return the API-approved claim candidates for one Pipeline."""
 
@@ -64,7 +66,8 @@ class PipelineRunClaimClient(RuntimeApiClient):
         value = self._request_object(
             method='GET', project_id=project_id,
             path=f'/pipelines/{encoded_pipeline_id}/runs',
-            params={'claimable': 'true'}, operation='Claimable-run list',
+            params={'claimable': 'true', 'worker_id': worker_id},
+            operation='Claimable-run list',
             object_error='Claimable-run list response must contain an items array.',
         )
         if not isinstance(value.get('items'), list):
