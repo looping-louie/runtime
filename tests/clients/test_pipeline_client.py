@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 import httpx
+import pytest
 
 from clients.pipeline_client import PipelineRunClaimClient
 
@@ -159,6 +160,45 @@ def test_claim_next_stops_when_the_global_worker_is_at_capacity() -> None:
 
     assert claim is None
     assert patch_count == 1
+
+
+def test_claim_next_reports_non_capacity_claim_conflicts() -> None:
+    """Runtime operators receive the API code when the worker is incompatible."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        """Offer one run whose required Harness is not advertised by the worker."""
+
+        if request.url.path == '/api/v1/pipelines':
+            return httpx.Response(200, json={'items': [{'id': 'pipeline-1'}], 'total': 1})
+        if request.method == 'GET':
+            return httpx.Response(
+                200,
+                json={
+                    'items': [{'etag': '"run-1-v1"', 'run': {'id': 'run-1'}}],
+                    'total': 1,
+                },
+            )
+        return httpx.Response(
+            409,
+            json={
+                'error': {
+                    'code': 'worker_harness_unavailable',
+                    'message': 'No active Worker supports the required Harness.',
+                },
+            },
+        )
+
+    client = PipelineRunClaimClient(
+        api_base_url='https://api.example/api/v1',
+        service_account_token='service-token',
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match='worker_harness_unavailable: No active Worker supports',
+    ):
+        client.claim_next(project_id='project-1', worker_id='worker-1')
 
 
 def _claim_response(run_id: str = 'run-1') -> dict[str, object]:

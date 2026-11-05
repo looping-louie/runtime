@@ -100,8 +100,7 @@ class PipelineRunClaimClient(RuntimeApiClient):
             ),
         )
         if response.status_code == httpx.codes.CONFLICT:
-            _require_worker_capacity_error(response)
-            raise WorkerCapacityUnavailableError
+            _raise_claim_conflict(response)
         if response.status_code == httpx.codes.PRECONDITION_FAILED:
             return None
         return self._to_claim(response.json(), project_id=project_id)
@@ -174,8 +173,8 @@ class WorkerCapacityUnavailableError(Exception):
     """Stop Project claim attempts after the Worker reaches capacity."""
 
 
-def _require_worker_capacity_error(response: httpx.Response) -> None:
-    """Reject unrelated claim conflicts that should remain runtime failures."""
+def _raise_claim_conflict(response: httpx.Response) -> None:
+    """Treat capacity as idle and report other runtime-claim conflicts."""
 
     try:
         value = response.json()
@@ -184,8 +183,17 @@ def _require_worker_capacity_error(response: httpx.Response) -> None:
     if not isinstance(value, dict):
         raise RuntimeError('Runtime claim conflict response must be a JSON object.')
     error = value.get('error')
-    if not isinstance(error, dict) or error.get('code') != 'worker_capacity_unavailable':
-        raise RuntimeError('Runtime claim conflict is not Worker capacity saturation.')
+    if not isinstance(error, dict):
+        raise RuntimeError('Runtime claim conflict response is missing an error object.')
+    if error.get('code') == 'worker_capacity_unavailable':
+        raise WorkerCapacityUnavailableError
+    code = error.get('code')
+    message = error.get('message')
+    if not isinstance(code, str) or not code:
+        raise RuntimeError('Runtime claim conflict response is missing an error code.')
+    if not isinstance(message, str) or not message:
+        raise RuntimeError(f'Runtime claim conflict: {code}.')
+    raise RuntimeError(f'Runtime claim conflict: {code}: {message}')
 
 
 def _require_text(value: dict[str, object], field_name: str) -> str:
